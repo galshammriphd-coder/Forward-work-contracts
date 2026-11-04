@@ -272,15 +272,43 @@ class BrowserManager:
 
         return self.call(_do, timeout=timeout, label="open")
 
+    def import_session(self, cookies: list[dict], timeout: float = 120) -> dict:
+        """Add the X session cookies copied from the user's own browser, then verify."""
+        def _do(bm: "BrowserManager"):
+            bm._page()
+            bm.context.clear_cookies()
+            bm.context.add_cookies(cookies)
+            result = bm._status(navigate=True)
+            if result["status"] != sm.STATUS_CONNECTED:
+                # X rejected the token: remove it so no half-valid session is kept.
+                bm.context.clear_cookies()
+                sm.record_status(sm.STATUS_DISCONNECTED, username="",
+                                 message="رفضت X الجلسة المنسوخة؛ تأكد من نسخ auth_token من متصفح مسجّل الدخول")
+            db.audit("session_imported", "x.com", {"names": sorted(c["name"] for c in cookies),
+                                                    "status": result["status"]})
+            return result
+
+        return self.call(_do, timeout=timeout, label="import_session")
+
     def check_status(self, navigate: bool = True, timeout: float = 90) -> dict:
         if self.busy_with and self.busy_with.startswith("job:"):
             return {**sm.current_status(), "busy": self.busy_with}
         return self.call(lambda bm: bm._status(navigate), timeout=timeout, label="status")
 
-    def logout(self, wipe: bool = False, timeout: float = 90) -> dict:
+    def logout(self, wipe: bool = False, server_logout: bool = True, timeout: float = 90) -> dict:
+        """server_logout=False only disconnects the app (clears local cookies) and keeps
+        the X session valid — needed when the session was copied from the user's own
+        browser, because logging out on x.com would also log that browser out."""
         def _do(bm: "BrowserManager"):
             result = {"logged_out": False}
-            if bm.is_open or sm.session_exists():
+            if not server_logout:
+                if bm.is_open:
+                    try:
+                        bm.context.clear_cookies()
+                    except Exception:
+                        pass
+                result["logged_out"] = True
+            elif bm.is_open or sm.session_exists():
                 page = bm._page()
                 try:
                     page.goto(config.X_LOGOUT_URL, wait_until="domcontentloaded")
@@ -301,7 +329,7 @@ class BrowserManager:
             if wipe:
                 sm.wipe_session()
             sm.record_status(sm.STATUS_DISCONNECTED, username="", message="تم تسجيل الخروج")
-            db.audit("logout", "x.com", {"wipe": wipe})
+            db.audit("logout", "x.com", {"wipe": wipe, "server_logout": server_logout})
             return result
 
         return self.call(_do, timeout=timeout, label="logout")

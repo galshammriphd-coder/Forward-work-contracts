@@ -96,3 +96,87 @@ def wipe_session() -> None:
     protect_session_dir(d)
     record_status(STATUS_DISCONNECTED, username="", message="تم حذف ملفات الجلسة المحلية")
     db.audit("session_wiped", str(d))
+
+
+# ------------------------------------------------- reuse an existing login
+# Chrome/Edge 136+ refuse automation of the user's main profile and encrypt its
+# cookies (app-bound encryption), so the app cannot read them by itself. The user
+# copies the X session cookies from their own browser once; they are added to the
+# app's private browser profile and never written to the database or the logs.
+import json as _json
+import re as _re
+import time as _time
+
+_X_DOMAINS = ("x.com", "twitter.com")
+_USEFUL = {"auth_token", "ct0", "twid", "kdt", "att", "guest_id", "personalization_id", "lang"}
+
+
+class CookieInputError(ValueError):
+    pass
+
+
+def _norm_cookie(name: str, value: str, expires=None, http_only=None, same_site=None) -> dict:
+    exp = None
+    try:
+        if expires not in (None, "", "Session") and float(expires) > _time.time():
+            exp = int(float(expires))
+    except (TypeError, ValueError):
+        exp = None
+    return {
+        "name": name.strip(),
+        "value": value.strip().strip('"'),
+        "domain": ".x.com",
+        "path": "/",
+        "expires": exp or int(_time.time()) + 180 * 24 * 3600,
+        "httpOnly": bool(http_only) if http_only is not None else name in ("auth_token", "kdt"),
+        "secure": True,
+        "sameSite": "None" if (same_site or "").lower() in ("", "none", "no_restriction", "unspecified") else (
+            "Lax" if (same_site or "").lower() == "lax" else "Strict"),
+    }
+
+
+def parse_cookie_input(text: str, ct0: str | None = None) -> list[dict]:
+    """Accepts: the auth_token value alone, a Cookie header ("a=b; c=d"), or a JSON
+    export (Cookie-Editor / EditThisCookie). Returns Playwright cookies for .x.com."""
+    t = (text or "").strip()
+    if not t:
+        raise CookieInputError("الصق قيمة auth_token أولاً")
+    cookies: list[dict] = []
+    if t.startswith("[") or t.startswith("{"):
+        try:
+            data = _json.loads(t)
+        except _json.JSONDecodeError as exc:
+            raise CookieInputError("نص JSON غير صالح") from exc
+        if isinstance(data, dict):
+            data = data.get("cookies", [data])
+        for c in data:
+            if not isinstance(c, dict) or not c.get("name"):
+                continue
+            dom = str(c.get("domain", "x.com"))
+            if not any(d in dom for d in _X_DOMAINS) or c["name"] not in _USEFUL:
+                continue
+            cookies.append(_norm_cookie(c["name"], str(c.get("value", "")), c.get("expirationDate") or c.get("expires"),
+                                        c.get("httpOnly"), c.get("sameSite")))
+    elif "=" in t:
+        if t.lower().startswith("cookie:"):
+            t = t[7:]
+        for part in t.split(";"):
+            if "=" not in part:
+                continue
+            name, value = part.split("=", 1)
+            if name.strip() in _USEFUL and value.strip():
+                cookies.append(_norm_cookie(name, value))
+    else:
+        cookies.append(_norm_cookie("auth_token", t))
+    if ct0 and ct0.strip():
+        cookies = [c for c in cookies if c["name"] != "ct0"] + [_norm_cookie("ct0", ct0)]
+    auth = [c for c in cookies if c["name"] == "auth_token"]
+    if not auth:
+        raise CookieInputError("لم يتم العثور على auth_token في النص الملصوق")
+    if not _re.fullmatch(r"[0-9a-fA-F]{20,80}", auth[0]["value"]):
+        raise CookieInputError("قيمة auth_token غير صحيحة (يجب أن تكون حروفاً وأرقاماً سداسية عشرية، عادة 40 خانة)")
+    for c in cookies:
+        if _re.search(r"[\s;,]", c["value"]):
+            raise CookieInputError(f"قيمة {c['name']} تحتوي على مسافات أو فواصل")
+    # keep the last occurrence of each name
+    return list({c["name"]: c for c in cookies}.values())

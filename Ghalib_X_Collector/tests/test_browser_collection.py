@@ -223,3 +223,48 @@ def test_dom_fallback_without_graphql(bm):
     assert (r["replies_count"], r["reposts_count"], r["likes_count"], r["views_count"]) == (1, 1500, 12, 2345)
     assert "😀" in r["raw_text"] and r["hashtags_json"] == '["وسم_اختبار"]'
     assert r["published_at"] == "2026-11-01T10:01:00+00:00"
+
+
+TOKEN = "0123456789abcdef0123456789abcdef01234567"
+
+
+def test_parse_cookie_input_formats():
+    one = sm.parse_cookie_input(TOKEN)
+    assert one[0]["name"] == "auth_token" and one[0]["domain"] == ".x.com" and one[0]["httpOnly"]
+    hdr = sm.parse_cookie_input(f"Cookie: guest_id=v1%3A1; auth_token={TOKEN}; ct0=abcdef123; other=zzz")
+    assert sorted(c["name"] for c in hdr) == ["auth_token", "ct0", "guest_id"]
+    js = json.dumps([{"name": "auth_token", "value": TOKEN, "domain": ".x.com", "expirationDate": 4102444800,
+                      "httpOnly": True, "sameSite": "no_restriction"},
+                     {"name": "auth_token", "value": "ffff", "domain": ".google.com"}])
+    parsed = sm.parse_cookie_input(js, ct0="beef")
+    assert {c["name"] for c in parsed} == {"auth_token", "ct0"}
+    assert [c for c in parsed if c["name"] == "auth_token"][0]["expires"] == 4102444800
+    for bad in ("", "not-a-token!", "ct0=abc", "auth_token=12 34"):
+        with pytest.raises(sm.CookieInputError):
+            sm.parse_cookie_input(bad)
+
+
+def test_import_session_connects_and_local_disconnect(bm):
+    _install_routes(bm)
+    r = bm.import_session(sm.parse_cookie_input(TOKEN, ct0="abc123"))
+    assert r["status"] == sm.STATUS_CONNECTED and r["username"] == "fixture_me"
+    # the imported session can collect immediately
+    jid = cm.create_job_from_params("after import", SearchParams(search_type="keyword", keywords="x"), max_posts=10)
+    assert cm.start_job(jid, manager=bm).result(timeout=180) == "completed"
+    # local disconnect never visits x.com/logout (the user's own browser stays logged in)
+    calls: list = []
+    bm.call(lambda b: b.context.route("https://x.com/logout*", lambda route: (calls.append(1), route.abort())), timeout=30)
+    bm.logout(wipe=True, server_logout=False)
+    assert calls == [] and sm.current_status()["status"] == sm.STATUS_DISCONNECTED and not sm.session_exists()
+
+
+def test_import_session_rejected_token_is_removed(bm):
+    def _do(b):
+        b._start(headless=True)
+        # X answers with the login form → token rejected
+        b.context.route("https://x.com/**", lambda r: r.fulfill(status=200, content_type="text/html",
+                                                                body='<html><body><input autocomplete="username"></body></html>'))
+    bm.call(_do, timeout=90)
+    r = bm.import_session(sm.parse_cookie_input(TOKEN))
+    assert r["status"] != sm.STATUS_CONNECTED
+    assert not sm.has_auth_cookie(bm.call(lambda b: b.context.cookies(["https://x.com"]), timeout=30))
