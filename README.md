@@ -109,3 +109,7 @@ The other tests cover ingestion (encodings, delimiters, Arabic digits, text Like
 - Identifiers can be pseudonymized and variables dropped through logged operations.
 - Deleting a project removes its database rows and its files.
 - The platform runs on-premise or self-hosted (Docker).
+
+## Ghalib X Data Collector
+
+A separate local application for collecting and analysing X (Twitter) search results through a logged-in browser session lives in [`Ghalib_X_Collector/`](Ghalib_X_Collector/README.md) (Arabic guide inside).

@@ -1,0 +1,6 @@
+# Optional: local Hugging Face models (sentiment / NER / summarisation).
+# Large download (PyTorch ~ 200 MB CPU build, models 0.5–1.2 GB each, fetched once to data/models).
+-r requirements.txt
+transformers>=4.40
+torch>=2.2
+sentencepiece>=0.2      # needed by the mT5 summarisation model
