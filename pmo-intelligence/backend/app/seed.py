@@ -459,6 +459,8 @@ def seed_demo(db: Session, today: date | None = None):
                 a.actual_start = a.planned_start
             if a.progress >= 100:
                 a.actual_end = a.planned_end
+        db.flush()
+        core.recompute_schedule(db, p)  # phase status follows the progress just set
         earned = sum((a.weight / 100) * a.progress / 100 for a in alist) * budget
         actual = earned * cf
         phases = list(db.scalars(select(m.ProjectPhase).where(m.ProjectPhase.project_id == p.id).order_by(m.ProjectPhase.order)))
