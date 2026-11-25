@@ -47,8 +47,9 @@ def evaluate(s: dict, thresholds: dict | None = None, today: date | None = None)
     out = []
     if s.get("status") in ("completed", "cancelled"):
         return out
+    paused = s.get("status") == "on_hold"  # a paused plan slipping is expected; keep risk, cost and governance rules
 
-    for a in s.get("activities", []):
+    for a in ([] if paused else s.get("activities", [])):
         end = a.get("planned_end")
         if end and end < today and (a.get("progress") or 0) < 100:
             days = (today - end).days
@@ -63,7 +64,7 @@ def evaluate(s: dict, thresholds: dict | None = None, today: date | None = None)
                               f"الفائض الزمني المتاح {a.get('total_float') or 0} يوماً؛ حدّث نسبة الإنجاز أو أعد جدولة النشاط.",
                               f"Available float is {a.get('total_float') or 0} days; update progress or reschedule."))
 
-    for m in s.get("milestones", []):
+    for m in ([] if paused else s.get("milestones", [])):
         td = m.get("target_date")
         if not td or m.get("status") == "achieved":
             continue
@@ -78,19 +79,19 @@ def evaluate(s: dict, thresholds: dict | None = None, today: date | None = None)
                           "تحقق من جاهزية المخرجات ومعيار الاعتماد.", "Check deliverable readiness and the acceptance criterion."))
 
     bf, ff = s.get("baseline_finish"), s.get("forecast_finish")
-    if bf and ff and (ff - bf).days > th["finish_slip"]:
+    if bf and ff and (ff - bf).days > th["finish_slip"] and not paused:
         out.append(_f("finish_slip", "project", s["id"],
                       f"موعد الانتهاء المتوقع يتأخر {(ff - bf).days} يوماً عن خط الأساس", f"Forecast finish is {(ff - bf).days} days past baseline",
                       "راجع المسار الحرج وقدّم طلب تغيير إذا تعذر الاستدراك.", "Review the critical path; raise a change request if recovery is not possible."))
 
     evm = s.get("evm") or {}
     gap = (evm.get("planned_pct") or 0) - (evm.get("earned_pct") or 0)
-    if gap > th["progress_rate_low"]:
+    if gap > th["progress_rate_low"] and not paused:
         out.append(_f("progress_rate_low", "project", s["id"],
                       f"الإنجاز الفعلي أقل من المخطط بـ {gap:.0f} نقطة مئوية", f"Actual progress is {gap:.0f} points behind plan",
                       "حدد الأنشطة المسببة للفجوة وضع لها خطة استدراك أسبوعية.", "Identify the activities causing the gap and set a weekly catch-up plan."))
     spi, cpi = evm.get("SPI"), evm.get("CPI")
-    if spi is not None and spi < th["spi_low"]:
+    if spi is not None and spi < th["spi_low"] and not paused:
         out.append(_f("spi_low", "project", s["id"], f"SPI = {spi:.2f} (أقل من {th['spi_low']})", f"SPI = {spi:.2f} (below {th['spi_low']})",
                       "الجدول يتأخر: ركّز على أنشطة المسار الحرج.", "Schedule is slipping: focus on critical-path activities.", bump=spi < 0.8))
     if cpi is not None and cpi < th["cpi_low"]:

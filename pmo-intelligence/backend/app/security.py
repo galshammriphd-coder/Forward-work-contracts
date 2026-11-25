@@ -85,7 +85,7 @@ def verify_totp(secret: str, code: str) -> bool:
 
 def current_user(request: Request, db: Session = Depends(get_db)) -> m.User:
     auth = request.headers.get("authorization", "")
-    token = auth[7:] if auth.lower().startswith("bearer ") else request.query_params.get("token")
+    token = auth[7:] if auth.lower().startswith("bearer ") else None  # header only: URLs end up in logs
     if not token:
         raise HTTPException(401, "Sign in to continue")
     try:

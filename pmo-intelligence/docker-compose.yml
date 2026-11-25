@@ -1,0 +1,28 @@
+# PMO INTELLIGENCE — on-premises / private-cloud deployment.
+#   cp .env.example .env   (set the two secrets)   then:   docker compose up -d --build
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: pmo
+      POSTGRES_USER: pmo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pmo"]
+      interval: 5s
+      retries: 10
+  app:
+    build: .
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://pmo:${POSTGRES_PASSWORD}@db:5432/pmo
+      PMO_SECRET_KEY: ${PMO_SECRET_KEY:?set PMO_SECRET_KEY in .env (python -c "import secrets;print(secrets.token_urlsafe(48))")}
+      PMO_SEED_DEMO: ${PMO_SEED_DEMO:-1}      # 0 = start empty (production)
+      PMO_LLM_API_KEY: ${PMO_LLM_API_KEY:-}   # only used if Settings > AI selects an endpoint
+    volumes: [documents:/data]
+volumes:
+  pgdata:
+  documents:

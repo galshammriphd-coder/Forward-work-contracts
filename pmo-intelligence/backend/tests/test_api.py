@@ -364,3 +364,49 @@ def test_global_search_and_meta(client, auth):
     assert any(r["type"] == "project" for r in res)
     assert all(r["project_id"] for r in client.get("/api/search?q=الخوادم", headers=auth("member")).json())
     assert client.get("/api/health").json()["status"] == "ok"
+
+
+def test_risk_responses_follow_project_scope(client, auth, pid):
+    mine = {r["id"] for r in client.get("/api/r/risks", headers=auth("member")).json()}
+    resp = client.get("/api/r/risk_responses", headers=auth("member")).json()
+    assert resp and all(r["risk_id"] in mine for r in resp)
+    assert len(resp) < len(client.get("/api/r/risk_responses", headers=auth("director")).json())
+    other = next(r for r in client.get(f"/api/r/risks?project_id={pid('DX-03')}", headers=auth("director")).json())
+    assert client.post("/api/r/risk_responses", headers=auth("pm1"), json={"risk_id": other["id"], "description": "x"}).status_code == 404
+
+
+def test_token_in_url_is_not_accepted(client, auth):
+    token = auth("director")["Authorization"].split()[1]
+    assert client.get(f"/api/dashboard?token={token}").status_code == 401
+
+
+def test_login_throttling_after_repeated_failures(client):
+    for _ in range(8):
+        assert client.post("/api/auth/login", json={"email": "viewer@pmo.local", "password": "nope"}).status_code == 401
+    r = client.post("/api/auth/login", json={"email": "viewer@pmo.local", "password": "Pmo@2026!"})
+    assert r.status_code == 429            # even the right password waits out the lock
+    assert client.post("/api/auth/login", json={"email": "risk@pmo.local", "password": "Pmo@2026!"}).status_code == 200
+
+
+def test_retention_purge_and_webhook_validation(client, auth):
+    from datetime import datetime, timedelta
+    from sqlalchemy import select
+    from app import models as m
+    from app.db import SessionLocal
+    from app.services import automation
+    with SessionLocal() as db:
+        u = db.scalar(select(m.User))
+        db.add(m.Notification(user_id=u.id, title="old", created_at=datetime.utcnow() - timedelta(days=400)))
+        db.add(m.Notification(user_id=u.id, title="fresh"))
+        audit_before = len(list(db.scalars(select(m.AuditLog.id))))
+        db.commit()
+        out = automation.purge(db)
+        db.commit()
+        assert out["notifications_days"] >= 1
+        titles = {n.title for n in db.scalars(select(m.Notification).where(m.Notification.user_id == u.id))}
+        assert "old" not in titles and "fresh" in titles
+        assert len(list(db.scalars(select(m.AuditLog.id)))) == audit_before      # audit trail untouched
+    h = auth("director")
+    rule = client.post("/api/r/automation_rules", headers=h, json={"name_ar": "ربط خارجي", "trigger_type": "manual", "actions": [{"type": "webhook", "url": "ftp://bad"}]}).json()
+    run = client.post(f"/api/automation/rules/{rule['id']}/run", headers=h, json={}).json()
+    assert run["status"] == "failed" and "http(s) URL" in run["error"]

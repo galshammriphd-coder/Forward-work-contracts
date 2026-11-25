@@ -12,7 +12,7 @@ from .. import models as m
 EVENTS = ["project.created", "charter.uploaded", "charter.approved", "project.activated", "document.uploaded",
           "alert.created", "risk.critical", "phase.completed", "project.completed", "approval.decided", "schedule.tick"]
 ACTIONS = ["notify", "start_workflow", "request_gate_approval", "run_early_warning", "create_closure_report",
-           "reindex_knowledge", "generate_wbs", "start_ai_analysis", "ai_summary_alert"]
+           "reindex_knowledge", "generate_wbs", "start_ai_analysis", "ai_summary_alert", "webhook"]
 
 
 # ---------- workflow ----------
@@ -134,6 +134,19 @@ def _do(db: Session, action: dict, payload: dict) -> str:
         text = copilot.project_brief(db, project, "ar")
         n = core.notify(db, action.get("roles") or ["pmo_director"], project, f"ملخص ذكي: {project.name_ar}", text, "advisory")
         return f"AI brief sent to {n} user(s)"
+    if kind == "webhook":
+        # Integration point (Teams / Power Automate / Jira / ERP). Sends event metadata only —
+        # never document content — to a URL an automation administrator typed in.
+        import httpx
+        url = (action.get("url") or "").strip()
+        if not url.lower().startswith(("https://", "http://")):
+            raise ValueError("webhook needs an http(s) URL")
+        body = {"event": payload.get("_event"), "project_code": project.code if project else None,
+                "project": project.name_en if project else None, "title": payload.get("title"),
+                "severity": payload.get("severity"), "rule_key": payload.get("rule_key")}
+        r = httpx.post(url, json=body, timeout=10)
+        r.raise_for_status()
+        return f"webhook delivered ({r.status_code})"
     raise ValueError(f"unknown action {kind}")
 
 
@@ -166,6 +179,7 @@ def emit(db: Session, event: str, payload: dict) -> list[m.AutomationRun]:
         rules = db.scalars(select(m.AutomationRule).where(m.AutomationRule.enabled, m.AutomationRule.event == event,
                                                           m.AutomationRule.trigger_type.in_(["event", "rule", "ai"])))
         # an event that does not meet a rule's conditions is not a run; only real executions are logged
+        payload = {**payload, "_event": event}
         return [run_rule(db, r, payload, event) for r in rules if _match(r.conditions, payload)]
     finally:
         _depth -= 1
@@ -180,9 +194,29 @@ def run_scheduled(db: Session, now: datetime | None = None) -> int:
         if not r.last_run_at or now - r.last_run_at >= gap.get(r.schedule or "daily", timedelta(days=1)):
             run_rule(db, r, {}, f"schedule:{r.schedule}")
             n += 1
+    purge(db, now)
     from . import reports
     for s in db.scalars(select(m.ReportSchedule).where(m.ReportSchedule.enabled)):
         if not s.last_run_at or now - s.last_run_at >= gap.get(s.frequency, timedelta(days=7)):
             reports.run_schedule(db, s)
             n += 1
     return n
+
+
+def purge(db: Session, now: datetime | None = None) -> dict:
+    """Data-retention policy from Settings. The audit trail is deliberately left alone."""
+    from sqlalchemy import delete
+    from .core import get_settings
+    now = now or datetime.utcnow()
+    r = get_settings(db).get("retention", {})
+    out = {}
+    for key, model, col, extra in (("notifications_days", m.Notification, m.Notification.created_at, None),
+                                   ("automation_runs_days", m.AutomationRun, m.AutomationRun.started_at, None),
+                                   ("resolved_alerts_days", m.Alert, m.Alert.resolved_at, m.Alert.status == "resolved")):
+        days = int(r.get(key) or 0)
+        if days > 0:
+            q = delete(model).where(col < now - timedelta(days=days))
+            if extra is not None:
+                q = q.where(extra)
+            out[key] = db.execute(q).rowcount
+    return out

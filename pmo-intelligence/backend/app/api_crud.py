@@ -139,6 +139,11 @@ def list_rows(name: str, project_id: int | None = None, db: Session = Depends(ge
                     cond = cond | model.project_id.is_(None)
                 q = q.where(cond)
     rows = list(db.scalars(q.order_by(model.id)))
+    if name == "risk_responses":  # no project column of its own: inherit the scope of the parent risk
+        ids = security.accessible_project_ids(db, user)
+        if ids is not None:
+            ok = set(db.scalars(select(m.Risk.id).where(m.Risk.project_id.in_(ids))))
+            rows = [r for r in rows if r.risk_id in ok]
     return [_out(name, r) for r in rows]
 
 

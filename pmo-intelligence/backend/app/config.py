@@ -25,5 +25,6 @@ DEFAULT_SETTINGS = {
     # (Ollama, vLLM, LM Studio on-premises, or a cloud service once the organisation consents).
     "ai": {"mode": "local", "endpoint_url": "", "endpoint_model": "", "endpoint_is_external": True,
            "external_consent": False, "allow_confidential_external": False, "embedding_model": "local-hash-v1"},
-    "evm": {"spi_warning": 0.9, "spi_critical": 0.8, "cpi_warning": 0.9, "cpi_critical": 0.8},
+    # days to keep; 0 = keep for ever. The audit trail is never purged automatically.
+    "retention": {"notifications_days": 180, "automation_runs_days": 365, "resolved_alerts_days": 365},
 }

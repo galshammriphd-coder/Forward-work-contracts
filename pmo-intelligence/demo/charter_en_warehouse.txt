@@ -1,0 +1,62 @@
+# Project Charter — Warehouse Management System
+
+## Key data
+Project Name: Warehouse Management System
+Project Sponsor: Khalid Al-Harbi
+Project Manager: Sara Al-Mutairi
+Business Owner: Supply Chain Department
+Approved Budget: SAR 2,750,000
+Start Date: 2027-01-10
+End Date: 2027-09-30
+Priority: High
+
+## Business Case
+Stock counts are done on paper and take nine days per quarter. Picking errors run at 3.1% of orders. A warehouse management system with handheld scanners is expected to cut counting time to two days and picking errors below 0.5%.
+
+## Project Objectives
+- Cut quarterly stock-count time from nine days to two
+- Reduce picking errors below 0.5% of orders
+- Give finance a daily view of stock value
+
+## Project Scope
+Select and configure a warehouse management system for the three central warehouses, integrate it with the finance system, supply handheld scanners and train warehouse staff.
+
+## Out of Scope
+Branch stores, transport management and supplier portals.
+
+## Deliverables
+- Configured warehouse management system
+- Finance system integration
+- Handheld scanners deployed in three warehouses
+- Trained warehouse staff
+
+## Milestones
+Milestone | Date
+Vendor selected | 2027-02-25
+Design approved | 2027-04-15
+Pilot warehouse live | 2027-07-01
+All warehouses live | 2027-09-15
+
+## Stakeholders
+Name | Role
+Khalid Al-Harbi | Sponsor
+Finance Department | Integration owner
+Warehouse supervisors | Key users
+
+## KPIs
+KPI | Target
+Picking error rate | 0.5%
+Stock count duration | 2 days
+
+## Assumptions
+- Warehouse Wi-Fi coverage is upgraded before the pilot
+- Finance provides an integration analyst for three months
+
+## Constraints
+- No go-live during the Ramadan peak season
+- Budget capped at SAR 2,750,000
+
+## Risks
+Risk | Probability | Impact | Mitigation
+Staff resist scanning every movement | High | Medium | Supervisors trained first; daily floor support in the first month
+Finance integration takes longer than planned | Medium | High | Start interface design in parallel with vendor selection

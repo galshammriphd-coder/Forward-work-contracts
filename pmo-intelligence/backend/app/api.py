@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Request, UploadFile
@@ -36,7 +36,13 @@ def _d(v):
 # ---------- auth ----------
 @router.post("/auth/login")
 def login(request: Request, data: dict = Body(...), db: Session = DB):
-    u = db.scalar(select(m.User).where(func.lower(m.User.email) == str(data.get("email", "")).strip().lower()))
+    email = str(data.get("email", "")).strip().lower()
+    since = datetime.utcnow() - timedelta(minutes=15)
+    recent = [a for a in db.scalars(select(m.AuditLog).where(m.AuditLog.action == "auth.login_failed", m.AuditLog.created_at >= since))
+              if str((a.detail or {}).get("email", "")).lower() == email]
+    if len(recent) >= 8:
+        raise HTTPException(429, "Too many failed attempts. Try again in 15 minutes.")
+    u = db.scalar(select(m.User).where(func.lower(m.User.email) == email))
     if not u or not u.is_active or not security.verify_password(data.get("password", ""), u.password_hash):
         security.audit(db, None, "auth.login_failed", "user", None, None, {"email": data.get("email")}, request)
         db.commit()
@@ -904,8 +910,10 @@ def run_rule(rid: int, data: dict = Body(default={}), db: Session = DB, user=sec
 @router.get("/automation/runs")
 def runs(limit: int = 100, db: Session = DB, user=security.need("project.read")):
     rules = {r.id: r for r in db.scalars(select(m.AutomationRule))}
+    ids = security.accessible_project_ids(db, user)
     return [{**core.to_dict(r), "rule_name_ar": rules[r.rule_id].name_ar, "rule_name_en": rules[r.rule_id].name_en}
-            for r in db.scalars(select(m.AutomationRun).order_by(m.AutomationRun.id.desc()).limit(min(limit, 500)))]
+            for r in db.scalars(select(m.AutomationRun).order_by(m.AutomationRun.id.desc()).limit(min(limit, 500)))
+            if ids is None or r.project_id in ids]
 
 
 # ---------- reports & copilot ----------

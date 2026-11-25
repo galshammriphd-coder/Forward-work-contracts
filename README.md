@@ -1,5 +1,7 @@
 # Research Analytics AI
 
+> **This repository now also contains PMO INTELLIGENCE** — an enterprise project, programme and portfolio management platform — in [`pmo-intelligence/`](pmo-intelligence/README.md). It is a separate application with its own backend, frontend, tests and Docker files. The rest of this file describes the earlier Research Analytics AI application.
+
 **منصة التحليل الإحصائي الذكي للاستبانات والبحوث العلمية** — AI-Powered Survey Analytics & Scientific Research Platform
 
 This is a working web application, not a mock-up. A researcher uploads a questionnaire CSV and the platform runs the whole data-science lifecycle on that file: understanding, cleaning, transformation, EDA, modelling, evaluation and reporting. It shows the results in interactive dashboards and produces an APA 7 report in Arabic or English. Every number is computed by tested statistical libraries from the uploaded data. Nothing in the analysis code is hard-coded, and no number is produced by a language model.

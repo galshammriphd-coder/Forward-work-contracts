@@ -1,6 +1,8 @@
 import os, shutil, tempfile
 _tmp = tempfile.mkdtemp(prefix="pmo_test_")
-os.environ.update(PMO_DATA_DIR=_tmp, PMO_SCHEDULER="0", PMO_SEED_DEMO="1", DATABASE_URL=f"sqlite:///{_tmp}/t.db")
+# default: a throw-away SQLite file. Set PMO_TEST_DATABASE_URL to run the same suite on PostgreSQL (use an empty database).
+os.environ.update(PMO_DATA_DIR=_tmp, PMO_SCHEDULER="0", PMO_SEED_DEMO="1",
+                  DATABASE_URL=os.environ.get("PMO_TEST_DATABASE_URL", f"sqlite:///{_tmp}/t.db"))
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
