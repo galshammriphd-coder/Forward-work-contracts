@@ -24,8 +24,8 @@ const WARM: Record<string, keyof typeof load> = { "/": "dashboard", "/strategy":
 const warm = (to: string) => { const k = WARM[to]; if (k) load[k]().catch(() => {}); };
 export const APP_NAME = "AI-Powered PMO Platform";
 
-export const Mark = ({ size = 30 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
-  <rect width="32" height="32" rx="7" fill="#17383f" /><path d="M5 16h8m6 0h8" stroke="#79C7DD" strokeWidth="2.5" strokeLinecap="round" /><path d="M16 9.5 22.5 16 16 22.5 9.5 16Z" fill="#F4B740" /></svg>;
+export const Mark = ({ size = 24 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+  <rect width="24" height="24" rx="5" fill="#0969da" /><path d="M6 8h8M6 12h12M6 16h5" stroke="#fff" strokeWidth="2" strokeLinecap="round" /></svg>;
 
 function Login() {
   const { T, setUser, lang, setLang } = useApp();
@@ -37,24 +37,20 @@ function Login() {
     try { const r = await api.post("/auth/login", creds); if (r.mfa_required) setMfa(true); else { setToken(r.token); setUser(r.user); } }
     catch (e: any) { setErr(e.message === "NETWORK" ? T("تعذر الاتصال بالخادم.", "Cannot reach the server.") : e.status === 401 ? T("البريد الإلكتروني أو كلمة المرور غير صحيحة.", "Email or password is incorrect.") : e.message); } finally { setBusy(false); } };
   const demo: [string, string, string][] = [["director", "مدير مكتب إدارة المشاريع", "PMO Director"], ["pm1", "مدير مشروع", "Project Manager"], ["finance", "المراقب المالي", "Financial Controller"], ["member", "عضو فريق", "Team Member"], ["viewer", "مطّلع تنفيذي", "Executive Viewer"], ["admin", "مدير النظام", "Super Administrator"]];
-  const life: [string, string][] = [["الفكرة", "Idea"], ["الميثاق", "Charter"], ["التخطيط", "Planning"], ["التنفيذ", "Delivery"], ["الإغلاق", "Closure"], ["القيمة", "Value"]];
-  return <div className="login">
-    <aside><div className="row"><Mark size={38} /><div><b style={{ fontFamily: "var(--display)", fontSize: "1.1rem" }} className="ltr">{APP_NAME}</b></div></div>
-      <div><h1 style={{ fontSize: "clamp(1.7rem, 3.2vw, 2.6rem)", color: "#fff", lineHeight: 1.4, maxWidth: "16ch" }}>{T("من ميثاق المشروع إلى قيمة تُقاس", "From project charter to measured value")}</h1>
-        <p style={{ color: "var(--rail-mute)", marginBlockStart: 14, maxWidth: "46ch" }}>{T("ارفع الميثاق فيصبح مشروعاً قابلاً للإدارة، ووثائقه معرفةً تُسأل، وبياناته مؤشرات وإنذارات.", "Upload a charter and it becomes a manageable project; its documents become knowledge you can question; its data become indicators and warnings.")}</p>
-        <ul className="rail-life" style={{ marginBlockStart: 34, maxWidth: 520 }}>{life.map(([a, e], i) => <li key={e} className={i < 3 ? "done" : i === 3 ? "now done" : ""} style={{ color: i === 3 ? "#fff" : "var(--rail-mute)" }}>{T(a, e)}</li>)}</ul></div>
-      <small style={{ color: "var(--rail-mute)" }} className="ltr">From Project Initiation to Strategic Value Realization</small></aside>
-    <main><form className="stack" style={{ width: "min(380px, 100%)" }} onSubmit={e => { e.preventDefault(); submit(); }}>
-      <div className="row" style={{ justifyContent: "space-between" }}><h2 style={{ fontSize: "1.4rem" }}>{T("تسجيل الدخول", "Sign in")}</h2><button type="button" className="btn ghost sm" onClick={() => setLang(lang === "ar" ? "en" : "ar")}><Languages />{lang === "ar" ? "English" : "العربية"}</button></div>
-      {err && <div className="note critical" role="alert">{err}</div>}
+  return <div className="login"><div className="login-card">
+    <div className="row" style={{ justifyContent: "center", gap: 10 }}><Mark size={30} /><h1 className="ltr" style={{ fontSize: "1.25rem" }}>{APP_NAME}</h1></div>
+    <form className="login-box" onSubmit={e => { e.preventDefault(); submit(); }}>
+      <div className="row" style={{ justifyContent: "space-between" }}><h2>{T("تسجيل الدخول", "Sign in")}</h2><button type="button" className="btn ghost sm" onClick={() => setLang(lang === "ar" ? "en" : "ar")}><Languages />{lang === "ar" ? "English" : "العربية"}</button></div>
+      {err ? <div className="note critical" role="alert">{err}</div> : null}
       <label className="field"><span>{T("البريد الإلكتروني", "Email")}</span><input className="input" dir="ltr" type="email" autoComplete="username" required value={v.email} onChange={e => setV({ ...v, email: e.target.value })} /></label>
       <label className="field"><span>{T("كلمة المرور", "Password")}</span><input className="input" dir="ltr" type="password" autoComplete="current-password" required value={v.password} onChange={e => setV({ ...v, password: e.target.value })} /></label>
-      {mfa && <label className="field"><span>{T("رمز التحقق من تطبيق المصادقة", "Code from your authenticator app")}</span><input className="input" dir="ltr" inputMode="numeric" autoFocus value={v.code} onChange={e => setV({ ...v, code: e.target.value })} /></label>}
-      <button className="btn primary" disabled={busy}>{busy && <i className="spin" />}{T("ادخل", "Sign in")}</button>
-      <div className="panel"><div className="body stack tight"><b className="small">{T("حسابات البيئة التجريبية (بيانات وهمية)", "Demo environment accounts (fictional data)")}</b>
-        <div className="row">{demo.map(([k, a, e]) => <button type="button" key={k} className="btn sm" onClick={() => submit({ email: `${k}@pmo.local`, password: "Pmo@2026!", code: "" })}>{T(a, e)}</button>)}</div>
-        <span className="small muted">{T("كل دور يرى ما تتيحه صلاحياته فقط. كلمة المرور لجميعها:", "Each role sees only what its permissions allow. Password for all:")} <bdi>Pmo@2026!</bdi></span></div></div>
-    </form></main></div>;
+      {mfa ? <label className="field"><span>{T("رمز التحقق من تطبيق المصادقة", "Code from your authenticator app")}</span><input className="input" dir="ltr" inputMode="numeric" autoFocus value={v.code} onChange={e => setV({ ...v, code: e.target.value })} /></label> : null}
+      <button className="btn primary" disabled={busy}>{busy ? <i className="spin" /> : null}{T("دخول", "Sign in")}</button>
+    </form>
+    <div className="login-box"><b className="small">{T("حسابات تجريبية (بيانات وهمية)", "Demo accounts (fictional data)")}</b>
+      <div className="row">{demo.map(([k, a, e]) => <button type="button" key={k} className="btn sm" onClick={() => submit({ email: `${k}@pmo.local`, password: "Pmo@2026!", code: "" })}>{T(a, e)}</button>)}</div>
+      <span className="small muted">{T("كلمة المرور:", "Password:")} <bdi>Pmo@2026!</bdi></span></div>
+  </div></div>;
 }
 
 function Picker({ children, title, sub, allowAll }: { children: (pid: number | undefined) => ReactNode; title: [string, string]; sub: [string, string]; allowAll?: boolean }) {
@@ -132,7 +128,7 @@ export default function App() {
   return <div className="shell">
     {open && <div className="scrim" onClick={() => setOpen(false)} />}
     <nav className={`rail ${open ? "open" : ""}`} aria-label={T("القائمة الرئيسية", "Main menu")}>
-      <Link to="/" className="brand" style={{ color: "inherit", textDecoration: "none" }}><Mark /><div><b>{APP_NAME}</b><small>From Project Initiation to Strategic Value Realization</small></div></Link>
+      <Link to="/" className="brand" style={{ color: "inherit", textDecoration: "none" }}><Mark /><div><b>{APP_NAME}</b></div></Link>
       <div className="nav">{nav.map(([k, title, items]) => <div key={k}><h5>{T(...title)}</h5>{items.filter(i => i[4] !== false).map(([to, a, e, I]) => <NavLink key={to} to={to} end={to === "/"} onPointerEnter={() => warm(to)} onFocus={() => warm(to)} title={T(a, e)}><I /><span>{T(a, e)}</span></NavLink>)}</div>)}</div>
     </nav>
     <div className="main">
