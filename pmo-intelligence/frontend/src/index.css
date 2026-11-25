@@ -1,4 +1,4 @@
-/* PMO Intelligence — design tokens.
+/* AI-Powered PMO Platform — design tokens.
    Ground: cool mineral paper. Ink: deep petrol. One accent (survey blue) for actions.
    Status colours are reserved for state and never used as decoration.
    Motif: the milestone diamond on a line, taken from the Gantt chart. */
@@ -48,7 +48,7 @@ bdi, .ltr { direction: ltr; unicode-bidi: isolate; }
 .shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
 .rail { background: var(--rail); color: var(--rail-ink); display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; border-inline-end: 1px solid var(--rail-line); }
 .brand { padding: 18px 18px 14px; display: flex; gap: 11px; align-items: center; border-block-end: 1px solid var(--rail-line); }
-.brand b { font-family: var(--display); font-weight: 700; font-size: .98rem; letter-spacing: .04em; display: block; line-height: 1.2; direction: ltr; }
+.brand b { font-family: var(--display); font-weight: 700; font-size: .95rem; letter-spacing: 0; white-space: nowrap; display: block; line-height: 1.2; direction: ltr; }
 .brand small { color: var(--rail-mute); font-size: .68rem; line-height: 1.35; display: block; direction: ltr; text-align: start; }
 .nav { padding: 8px 10px 20px; flex: 1; }
 .nav h5 { margin: 14px 8px 4px; font: 500 .72rem var(--font); color: var(--rail-mute); }
@@ -208,3 +208,111 @@ mark { background: var(--warning-bg); color: inherit; padding: 1px 2px; border-r
 @media print { .rail, .top, .no-print { display: none !important; } .shell { display: block; } body { background: #fff; } }
 /* numbers, dates, emails and URLs stay left-to-right but sit on the reading side of an RTL form */
 [dir="rtl"] input.input[type="number"], [dir="rtl"] input.input[type="date"], [dir="rtl"] .input[dir="ltr"] { direction: ltr; text-align: right; }
+
+/* =====================================================================================
+   Layer 2 — fluid layout and the control language.
+   Controls borrow from the Gantt chart: an action is a bar that fills, and it ends in a
+   milestone diamond. Hover fills the track; press lands the milestone.
+   ===================================================================================== */
+:root { --origin: left; --ease: cubic-bezier(.2, .8, .2, 1); --spring: cubic-bezier(.3, 1.7, .5, 1); --gap: clamp(12px, 1.1vw, 20px); --pad: clamp(14px, 1.9vw, 30px); }
+:root[dir="rtl"] { --origin: right; }
+html { font-size: clamp(14px, 13.1px + .13vw, 16px); }
+
+/* ---------- buttons ---------- */
+.btn { position: relative; isolation: isolate; overflow: hidden; border-radius: 7px; padding-inline: 14px; -webkit-tap-highlight-color: transparent;
+  transition: background-color .18s, border-color .18s, color .18s, box-shadow .22s, transform .12s; }
+.btn::before { content: ""; position: absolute; inset-inline: 0; inset-block-end: 0; height: 2px; background: var(--track, var(--accent)); z-index: -1;
+  transform: scaleX(0); transform-origin: var(--origin) 50%; transition: transform .34s var(--ease); }
+.btn::after { content: ""; position: absolute; inset-inline-end: 8px; inset-block-end: -3.5px; width: 7px; height: 7px; background: var(--gold);
+  transform: rotate(45deg) scale(0); transition: transform .22s var(--spring) .2s; }
+.btn:hover::before, .btn:focus-visible::before, .btn[aria-pressed="true"]::before, .btn[aria-expanded="true"]::before { transform: scaleX(1); }
+.btn:hover::after, .btn:focus-visible::after { transform: rotate(45deg) scale(1); }
+.btn:hover { border-color: var(--ink-3); background: var(--raised); }
+.btn:active { transform: translateY(1px) scale(.985); }
+.btn:active::after { transform: rotate(45deg) scale(1.9); transition-delay: 0s; transition-duration: .1s; }
+.btn svg { transition: transform .22s var(--ease); }
+.btn:hover svg:first-child { transform: translateX(calc(var(--dir) * -1.5px)) scale(1.06); }
+.btn:hover svg.flip:first-child, [dir="rtl"] .btn:hover svg.flip:first-child { transform: scaleX(calc(var(--dir) * 1)) scale(1.06); }
+
+.btn.primary { --track: var(--gold); background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; box-shadow: 0 1px 0 rgba(255, 255, 255, .14) inset; }
+.btn.primary::before { height: 3px; }
+.btn.primary:hover { background: color-mix(in oklab, var(--accent) 88%, #000); border-color: transparent; filter: none; box-shadow: 0 10px 22px -12px var(--accent), 0 1px 0 rgba(255, 255, 255, .14) inset; }
+.btn.danger { --track: var(--critical); } .btn.danger::after { background: var(--critical); }
+.btn.danger:hover { background: var(--critical-bg); border-color: var(--critical); }
+.btn.ghost { border-color: transparent; background: transparent; } .btn.ghost:hover { background: var(--sunk); border-color: transparent; }
+.btn.icon, .btn.sm.icon { padding-inline: 5px; } .btn.icon::after { display: none; }
+.btn.sm { padding-inline: 10px; border-radius: 6px; } .btn.sm::after { width: 6px; height: 6px; inset-block-end: -3px; inset-inline-end: 6px; }
+.btn:disabled, .btn:disabled:hover { background: var(--sunk); color: var(--ink-3); border-color: var(--line-2); box-shadow: none; transform: none; opacity: 1; }
+.btn.primary:disabled, .btn.primary:disabled:hover { background: color-mix(in oklab, var(--accent) 38%, var(--sunk)); color: var(--accent-ink); border-color: transparent; }
+.btn:disabled::before, .btn:disabled::after { display: none; }
+.btn:disabled svg { transform: none !important; }
+/* busy: the track runs instead of filling */
+.btn:has(.spin)::before { display: block; transform: none; width: 40%; inset-inline: auto; left: 0; animation: track 1s var(--ease) infinite; }
+.btn:has(.spin) .spin { display: none; } .btn:has(.spin) { cursor: progress; }
+@keyframes track { from { transform: translateX(-110%); } to { transform: translateX(280%); } }
+label.tag { transition: background-color .15s, color .15s; } label.tag:hover { background: var(--accent-soft); color: var(--ink); }
+label.tag:has(input:checked) { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+input[type="checkbox"] { accent-color: var(--accent); width: 15px; height: 15px; }
+.input { border-radius: 7px; transition: border-color .15s, box-shadow .15s; } .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ---------- tabs, menu, tiles share the same language ---------- */
+.tabs { gap: 0; scrollbar-width: thin; padding-block-end: 1px; mask-image: linear-gradient(to var(--mask-end, right), #000 calc(100% - 28px), transparent); }
+[dir="rtl"] .tabs { --mask-end: left; }
+.tabs button { position: relative; padding: 9px 14px; border-block-end: 0; margin-block-end: 0; transition: color .15s; }
+.tabs button::before { content: ""; position: absolute; inset-inline: 10px; inset-block-end: 0; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: var(--origin) 50%; transition: transform .28s var(--ease); }
+.tabs button:hover::before { transform: scaleX(.45); background: var(--ink-3); } .tabs button[aria-selected="true"]::before { transform: scaleX(1); background: var(--accent); }
+.tabs button::after { content: ""; position: absolute; inset-block-end: -3px; left: 50%; width: 7px; height: 7px; margin-left: -3.5px; background: var(--gold); transform: rotate(45deg) scale(0); transition: transform .2s var(--spring) .12s; }
+.tabs button[aria-selected="true"]::after { transform: rotate(45deg) scale(1); }
+.nav a { transition: background-color .15s, color .15s, padding .2s var(--ease); min-height: 34px; }
+.nav a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav a svg { transition: transform .2s var(--ease), opacity .15s; } .nav a:hover svg, .nav a.active svg { opacity: 1; } .nav a:hover svg { transform: scale(1.12); }
+.nav a:not(.active):hover { padding-inline-start: 12px; }
+.nav a.active::before { transition: transform .25s var(--spring); } .nav a.active:hover::before { transform: translateY(-50%) rotate(45deg) scale(1.25); }
+.kpis { grid-template-columns: repeat(auto-fill, minmax(clamp(150px, 15vw, 210px), 1fr)); border-radius: 10px; }
+.kpi { position: relative; padding: clamp(10px, 1vw, 15px) clamp(12px, 1.2vw, 18px); border: 0; box-shadow: .5px .5px 0 0 var(--line-2), inset .5px .5px 0 0 var(--line-2); transition: background-color .15s; }
+button.kpi::after { content: ""; position: absolute; inset-inline: 0; inset-block-end: 0; height: 2px; background: var(--accent); transform: scaleX(0); transform-origin: var(--origin) 50%; transition: transform .3s var(--ease); }
+button.kpi:hover::after, button.kpi:focus-visible::after { transform: scaleX(1); }
+button.kpi b { transition: transform .2s var(--ease); transform-origin: var(--origin) 50%; } button.kpi:hover b { transform: scale(1.04); }
+.kpi b { font-size: clamp(1.1rem, .85rem + .55vw, 1.45rem); }
+.tbl tr.click { transition: background-color .12s; } .tbl tr.click:hover { box-shadow: inset calc(var(--dir) * 3px) 0 0 var(--accent); }
+.cite { transition: border-color .15s, background-color .15s, transform .15s; } .cite:hover { background: var(--surface); }
+.steps button { transition: background-color .15s, color .15s; } .steps button:not(:disabled):hover { background: var(--raised); color: var(--ink); }
+
+/* ---------- fluid page ---------- */
+.shell { grid-template-columns: clamp(224px, 17vw, 268px) minmax(0, 1fr); }
+.top { padding: 9px var(--pad); gap: clamp(6px, .8vw, 12px); min-height: 56px; }
+.page { padding: clamp(14px, 1.6vw, 26px) var(--pad) 64px; max-width: 1680px; margin-inline: auto; }
+.page-head { margin-block-end: var(--gap); gap: 10px var(--gap); } .page-head > div:first-child { min-width: min(100%, 320px); flex: 1 1 420px; }
+.page-head p { margin-block-start: 4px; } h1 { font-size: clamp(1.3rem, 1rem + .9vw, 1.75rem); }
+.stack { gap: var(--gap); } .grid { gap: var(--gap); }
+.panel { border-radius: 10px; } .panel > header { padding: 12px clamp(12px, 1.2vw, 18px); } .panel > .body { padding: clamp(12px, 1.2vw, 18px); }
+.g2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); }
+.g3 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.g4 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
+.split { grid-template-columns: minmax(0, 1fr) clamp(300px, 27vw, 420px); }
+.form-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+.chat { grid-template-columns: clamp(200px, 20vw, 280px) minmax(0, 1fr); gap: var(--gap); }
+.chat-log { max-height: max(320px, calc(100vh - 380px)); }
+.chat-log > .msg { content-visibility: auto; contain-intrinsic-size: auto 160px; }
+.gantt { grid-template-columns: clamp(150px, 24vw, 340px) minmax(0, 1fr); border-radius: 10px; }
+.modal { border-radius: 12px; width: min(680px, 100%); } .modal.wide { width: min(1040px, 100%); }
+.tbl th, .tbl td { padding-inline: clamp(8px, .9vw, 14px); }
+.rail-life li { flex-basis: clamp(64px, 7vw, 96px); }
+@media (max-width: 1180px) { .split, .chat { grid-template-columns: minmax(0, 1fr); } .split > .panel[style] { position: static !important; } .kpis { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+@media (max-width: 720px) { .top .who { display: none; } .page-head .row { width: 100%; } .page-head .row > .btn, .page-head .row > .field { flex: 1 1 auto; } .tbl { font-size: .84rem; } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- mid-width screens: the menu folds to icons and opens on hover or keyboard focus ---------- */
+@media (min-width: 961px) and (max-width: 1320px) {
+  .shell { grid-template-columns: 64px minmax(0, 1fr); }
+  .rail { width: 64px; overflow-x: hidden; transition: width .24s var(--ease), box-shadow .24s; z-index: 30; }
+  .rail:hover, .rail:focus-within { width: 268px; box-shadow: var(--shadow); }
+  .rail .brand > div, .rail .nav h5, .rail .nav a span { opacity: 0; transition: opacity .16s; white-space: nowrap; }
+  .rail:hover .brand > div, .rail:hover .nav h5, .rail:hover .nav a span, .rail:focus-within .brand > div, .rail:focus-within .nav h5, .rail:focus-within .nav a span { opacity: 1; }
+  .rail .brand { padding-inline: 17px; } .rail .nav { padding-inline: 12px; } .rail .nav a { padding-inline: 12px; gap: 14px; } .rail .nav h5 { height: 14px; overflow: hidden; }
+  .nav a.active::before { inset-inline-start: -9px; width: 6px; height: 6px; }
+}
+/* KPI bands hold 4, 8 or 16 tiles: four columns (two on narrow screens) never leave an orphan row */
+.kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1180px) { .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.brand svg { flex: none; }

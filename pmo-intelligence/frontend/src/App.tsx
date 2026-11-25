@@ -1,20 +1,28 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ComponentType, lazy, ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { Bell, BookOpenCheck, Bot, Briefcase, CalendarRange, CircleDollarSign, FileStack, FileUp, FolderKanban, Gauge, Languages, Layers, ListTree, LogOut, Menu, MessagesSquare, Moon, Scale, Search, Settings, ShieldAlert, Sun, Target, Users, Workflow, FileBarChart } from "lucide-react";
-import { api, hasToken, setToken, useApp, useLoad } from "./lib/core";
+import { api, hasToken, setToken, store, useApp, useLoad } from "./lib/core";
 import { Loading } from "./lib/ui";
-import Dashboard from "./pages/Dashboard";
-import { Portfolios, Projects, Strategy } from "./pages/Portfolio";
-import ProjectCenter from "./pages/ProjectCenter";
-import Initiation from "./pages/Initiation";
-import Schedule, { Planning } from "./pages/Schedule";
-import Risks from "./pages/Risks";
-import Finance from "./pages/Finance";
-import { Resources } from "./pages/People";
-import { Chat, Documents } from "./pages/Knowledge";
-import { Automation, Governance } from "./pages/Govern";
-import Reports from "./pages/Reports";
-import { Admin, Copilot, Lessons } from "./pages/Misc";
+
+// Route-level code splitting: each module is fetched when first opened (bundle-dynamic-imports),
+// and warmed up when the pointer or keyboard focus reaches its menu entry (bundle-preload).
+const load = {
+  dashboard: () => import("./pages/Dashboard"), portfolio: () => import("./pages/Portfolio"), center: () => import("./pages/ProjectCenter"),
+  initiation: () => import("./pages/Initiation"), schedule: () => import("./pages/Schedule"), risks: () => import("./pages/Risks"),
+  finance: () => import("./pages/Finance"), people: () => import("./pages/People"), knowledge: () => import("./pages/Knowledge"),
+  govern: () => import("./pages/Govern"), reports: () => import("./pages/Reports"), misc: () => import("./pages/Misc"),
+};
+const pick = <K extends keyof typeof load>(k: K, name: string) => lazy<ComponentType<any>>(() => (load[k]() as Promise<any>).then(m => ({ default: m[name] })));
+const Dashboard = pick("dashboard", "default"), Strategy = pick("portfolio", "Strategy"), Portfolios = pick("portfolio", "Portfolios"), Projects = pick("portfolio", "Projects");
+const ProjectCenter = pick("center", "default"), Initiation = pick("initiation", "default"), Schedule = pick("schedule", "default"), Planning = pick("schedule", "Planning");
+const Risks = pick("risks", "default"), Finance = pick("finance", "default"), Resources = pick("people", "Resources"), Chat = pick("knowledge", "Chat"), Documents = pick("knowledge", "Documents");
+const Governance = pick("govern", "Governance"), Automation = pick("govern", "Automation"), Reports = pick("reports", "default");
+const Admin = pick("misc", "Admin"), Copilot = pick("misc", "Copilot"), Lessons = pick("misc", "Lessons");
+const WARM: Record<string, keyof typeof load> = { "/": "dashboard", "/strategy": "portfolio", "/portfolios": "portfolio", "/programs": "portfolio", "/projects": "portfolio", "/initiation": "initiation",
+  "/planning": "schedule", "/scheduling": "schedule", "/risks": "risks", "/financial": "finance", "/resources": "people", "/documents": "knowledge", "/knowledge": "knowledge",
+  "/governance": "govern", "/automation": "govern", "/reports": "reports", "/copilot": "misc", "/lessons": "misc", "/admin": "misc" };
+const warm = (to: string) => { const k = WARM[to]; if (k) load[k]().catch(() => {}); };
+export const APP_NAME = "AI-Powered PMO Platform";
 
 export const Mark = ({ size = 30 }: { size?: number }) => <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true">
   <rect width="32" height="32" rx="7" fill="#17383f" /><path d="M5 16h8m6 0h8" stroke="#79C7DD" strokeWidth="2.5" strokeLinecap="round" /><path d="M16 9.5 22.5 16 16 22.5 9.5 16Z" fill="#F4B740" /></svg>;
@@ -31,7 +39,7 @@ function Login() {
   const demo: [string, string, string][] = [["director", "مدير مكتب إدارة المشاريع", "PMO Director"], ["pm1", "مدير مشروع", "Project Manager"], ["finance", "المراقب المالي", "Financial Controller"], ["member", "عضو فريق", "Team Member"], ["viewer", "مطّلع تنفيذي", "Executive Viewer"], ["admin", "مدير النظام", "Super Administrator"]];
   const life: [string, string][] = [["الفكرة", "Idea"], ["الميثاق", "Charter"], ["التخطيط", "Planning"], ["التنفيذ", "Delivery"], ["الإغلاق", "Closure"], ["القيمة", "Value"]];
   return <div className="login">
-    <aside><div className="row"><Mark size={38} /><div><b style={{ fontFamily: "var(--display)", letterSpacing: ".05em", fontSize: "1.1rem" }} className="ltr">PMO INTELLIGENCE</b></div></div>
+    <aside><div className="row"><Mark size={38} /><div><b style={{ fontFamily: "var(--display)", fontSize: "1.1rem" }} className="ltr">{APP_NAME}</b></div></div>
       <div><h1 style={{ fontSize: "clamp(1.7rem, 3.2vw, 2.6rem)", color: "#fff", lineHeight: 1.4, maxWidth: "16ch" }}>{T("من ميثاق المشروع إلى قيمة تُقاس", "From project charter to measured value")}</h1>
         <p style={{ color: "var(--rail-mute)", marginBlockStart: 14, maxWidth: "46ch" }}>{T("ارفع الميثاق فيصبح مشروعاً قابلاً للإدارة، ووثائقه معرفةً تُسأل، وبياناته مؤشرات وإنذارات.", "Upload a charter and it becomes a manageable project; its documents become knowledge you can question; its data become indicators and warnings.")}</p>
         <ul className="rail-life" style={{ marginBlockStart: 34, maxWidth: 520 }}>{life.map(([a, e], i) => <li key={e} className={i < 3 ? "done" : i === 3 ? "now done" : ""} style={{ color: i === 3 ? "#fff" : "var(--rail-mute)" }}>{T(a, e)}</li>)}</ul></div>
@@ -52,9 +60,9 @@ function Login() {
 function Picker({ children, title, sub, allowAll }: { children: (pid: number | undefined) => ReactNode; title: [string, string]; sub: [string, string]; allowAll?: boolean }) {
   const { T, N } = useApp();
   const q = useLoad<any[]>("/projects");
-  const [pid, setPid] = useState<string>(localStorage.getItem("pmo_project") || "");
+  const [pid, setPid] = useState<string>(store.get("pmo_project") || "");
   useEffect(() => { if (q.data && !allowAll && !q.data.some(p => String(p.id) === pid) && q.data[0]) setPid(String(q.data[0].id)); }, [q.data]);  // eslint-disable-line
-  useEffect(() => { pid && localStorage.setItem("pmo_project", pid); }, [pid]);
+  useEffect(() => { pid && store.set("pmo_project", pid); }, [pid]);
   const cur = (q.data || []).find(p => String(p.id) === pid);
   return <div className="page">
     <div className="page-head"><div><h1>{T(...title)}</h1><p>{T(...sub)}</p></div>
@@ -124,8 +132,8 @@ export default function App() {
   return <div className="shell">
     {open && <div className="scrim" onClick={() => setOpen(false)} />}
     <nav className={`rail ${open ? "open" : ""}`} aria-label={T("القائمة الرئيسية", "Main menu")}>
-      <Link to="/" className="brand" style={{ color: "inherit", textDecoration: "none" }}><Mark /><div><b>PMO INTELLIGENCE</b><small>From Project Initiation to Strategic Value Realization</small></div></Link>
-      <div className="nav">{nav.map(([k, title, items]) => <div key={k}><h5>{T(...title)}</h5>{items.filter(i => i[4] !== false).map(([to, a, e, I]) => <NavLink key={to} to={to} end={to === "/"}><I />{T(a, e)}</NavLink>)}</div>)}</div>
+      <Link to="/" className="brand" style={{ color: "inherit", textDecoration: "none" }}><Mark /><div><b>{APP_NAME}</b><small>From Project Initiation to Strategic Value Realization</small></div></Link>
+      <div className="nav">{nav.map(([k, title, items]) => <div key={k}><h5>{T(...title)}</h5>{items.filter(i => i[4] !== false).map(([to, a, e, I]) => <NavLink key={to} to={to} end={to === "/"} onPointerEnter={() => warm(to)} onFocus={() => warm(to)} title={T(a, e)}><I /><span>{T(a, e)}</span></NavLink>)}</div>)}</div>
     </nav>
     <div className="main">
       <header className="top no-print"><a href="#content" className="btn ghost sm" style={{ position: "absolute", insetInlineStart: -9999 }} onFocus={e => (e.currentTarget.style.insetInlineStart = "8px")} onBlur={e => (e.currentTarget.style.insetInlineStart = "-9999px")}>{T("انتقل إلى المحتوى", "Skip to content")}</a>
@@ -134,9 +142,9 @@ export default function App() {
         <button className="btn ghost sm" onClick={() => setLang(lang === "ar" ? "en" : "ar")}><Languages /><span lang={lang === "ar" ? "en" : "ar"}>{lang === "ar" ? "English" : "العربية"}</span></button>
         <button className="btn ghost icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? T("الوضع الفاتح", "Light mode") : T("الوضع الداكن", "Dark mode")}>{theme === "dark" ? <Sun /> : <Moon />}</button>
         <Bell_ />
-        <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}><div style={{ textAlign: "end", lineHeight: 1.3 }} className="small"><div className="strong">{N(user)}</div><div className="muted">{N(user, "role_name")}</div></div>
+        <div className="row" style={{ gap: 6, flexWrap: "nowrap" }}><div style={{ textAlign: "end", lineHeight: 1.3 }} className="small who"><div className="strong">{N(user)}</div><div className="muted">{N(user, "role_name")}</div></div>
           <button className="btn ghost icon" onClick={() => { setToken(""); setUser(null); }} aria-label={T("تسجيل الخروج", "Sign out")}><LogOut className="flip" /></button></div></header>
-      <main id="content"><Routes>
+      <main id="content"><Suspense fallback={<Loading />}><Routes>
         <Route path="/" element={<Dashboard />} /><Route path="/strategy" element={<Strategy />} /><Route path="/portfolios" element={<Portfolios kind="portfolios" key="pf" />} /><Route path="/programs" element={<Portfolios kind="programs" key="pg" />} />
         <Route path="/projects" element={<Projects />} /><Route path="/projects/:id" element={<ProjectCenter />} /><Route path="/projects/:id/:tab" element={<ProjectCenter />} />
         <Route path="/initiation" element={<Initiation />} /><Route path="/initiation/:sid" element={<Initiation />} />
@@ -148,6 +156,6 @@ export default function App() {
         <Route path="/documents" element={P(["وثائق المشروع", "Project documents"], ["مستودع وثائق مستقل لكل مشروع: رفع، إصدارات، فهرسة، مقارنة.", "A separate repository per project: upload, versions, indexing, comparison."], pid => <Documents pid={pid} />)} />
         <Route path="/knowledge" element={P(["معرفة المشروع والمحادثة الذكية", "Project knowledge and AI chat"], ["حاور وثائق مشروع واحد. الإجابات موثقة بالملف والصفحة والمقتطف.", "Talk to one project's documents. Answers cite the file, page and excerpt."], pid => <Chat pid={pid} />)} />
         <Route path="/governance" element={<Governance />} /><Route path="/automation" element={<Automation />} /><Route path="/reports" element={<Reports />} /><Route path="/copilot" element={<Copilot />} /><Route path="/lessons" element={<Lessons />} /><Route path="/admin" element={<Admin />} />
-        <Route path="*" element={<Navigate to="/" replace />} /></Routes></main>
+        <Route path="*" element={<Navigate to="/" replace />} /></Routes></Suspense></main>
     </div></div>;
 }

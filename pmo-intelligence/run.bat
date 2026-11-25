@@ -1,10 +1,10 @@
 @echo off
 setlocal
-title PMO INTELLIGENCE
+title AI-Powered PMO Platform
 cd /d "%~dp0backend"
 
 echo ============================================================
-echo  PMO INTELLIGENCE - local run
+echo  AI-Powered PMO Platform - local run
 echo ============================================================
 echo.
 echo [1/4] Looking for Python...

@@ -1,4 +1,4 @@
-# PMO INTELLIGENCE — on-premises / private-cloud deployment.
+# AI-Powered PMO Platform — on-premises / private-cloud deployment.
 #   cp .env.example .env   (set the two secrets)   then:   docker compose up -d --build
 services:
   db:

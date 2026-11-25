@@ -1,4 +1,4 @@
-# PMO INTELLIGENCE — Architecture, data model and assumptions
+# AI-Powered PMO Platform — Architecture, data model and assumptions
 
 ## 1. Layers
 

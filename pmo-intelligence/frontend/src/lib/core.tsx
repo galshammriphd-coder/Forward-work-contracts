@@ -1,8 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 
 /* ---------------- API ---------------- */
-let token = localStorage.getItem("pmo_token") || "";
-export const setToken = (t: string) => { token = t; t ? localStorage.setItem("pmo_token", t) : localStorage.removeItem("pmo_token"); };
+/* Storage can throw (private mode, blocked site data): never let that break the app. */
+export const store = {
+  get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k: string, v: string | null) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
+};
+let token = store.get("pmo_token") || "";
+export const setToken = (t: string) => { token = t; store.set("pmo_token", t || null); };
 export const hasToken = () => !!token;
 
 export class ApiError extends Error { status: number; constructor(msg: string, status: number) { super(msg); this.status = status; } }
@@ -24,8 +29,18 @@ async function req(method: string, path: string, body?: any, raw = false): Promi
   }
   return raw ? res.blob() : res.json();
 }
+/* Several components on one screen ask for the same list (projects, portfolios…). Identical GETs that are
+   in flight at the same moment share one network request (client-swr-dedup). Nothing is cached after it settles. */
+const inflight = new Map<string, Promise<any>>();
+function get(path: string): Promise<any> {
+  const hit = inflight.get(path);
+  if (hit) return hit;
+  const p = req("GET", path).finally(() => inflight.delete(path));
+  inflight.set(path, p);
+  return p;
+}
 export const api = {
-  get: (p: string) => req("GET", p), post: (p: string, b?: any) => req("POST", p, b ?? {}), patch: (p: string, b: any) => req("PATCH", p, b),
+  get, post: (p: string, b?: any) => req("POST", p, b ?? {}), patch: (p: string, b: any) => req("PATCH", p, b),
   put: (p: string, b: any) => req("PUT", p, b), del: (p: string) => req("DELETE", p), blob: (p: string, b?: any) => req(b ? "POST" : "GET", p, b, true),
 };
 export function saveBlob(blob: Blob, name: string) {
@@ -45,13 +60,13 @@ const C = createContext<Ctx>(null as any);
 export const useApp = () => useContext(C);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangS] = useState<Lang>((localStorage.getItem("pmo_lang") as Lang) || "ar");
-  const [theme, setThemeS] = useState(localStorage.getItem("pmo_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+  const [lang, setLangS] = useState<Lang>((store.get("pmo_lang") as Lang) || "ar");
+  const [theme, setThemeS] = useState(store.get("pmo_theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   const [user, setUser] = useState<any>(null);
   const [meta, setMeta] = useState<any>(null);
   const [toasts, setToasts] = useState<{ id: number; msg: string; kind: string }[]>([]);
-  useEffect(() => { document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"; localStorage.setItem("pmo_lang", lang); }, [lang]);
-  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("pmo_theme", theme); }, [theme]);
+  useEffect(() => { document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"; store.set("pmo_lang", lang); }, [lang]);
+  useEffect(() => { document.documentElement.dataset.theme = theme; store.set("pmo_theme", theme); }, [theme]);
   const reloadMeta = useCallback(() => { api.get("/meta").then(setMeta).catch(() => {}); }, []);
   useEffect(() => { if (user) reloadMeta(); else setMeta(null); }, [user, reloadMeta]);
   const toast = useCallback((msg: string, kind: "ok" | "error" = "ok") => {

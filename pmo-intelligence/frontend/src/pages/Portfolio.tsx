@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { FileUp, Plus } from "lucide-react";
 import { api, useApp, useLoad } from "../lib/core";
@@ -41,6 +41,7 @@ export function Projects() {
   const [add, setAdd] = useState(false);
   const [text, setText] = useState("");
   const f = sp.get("f") || "all";
+  const needle = useDeferredValue(text).trim().toLowerCase();
   const F: Record<string, [string, string, (p: any) => boolean]> = { all: ["الكل", "All", () => true], active: ["النشطة", "Active", p => p.status === "active"], planned: ["المخطط لها", "Planned", p => p.status === "planned"],
     delayed: ["المتأخرة", "Delayed", p => p.metrics.delayed], on_hold: ["المتوقفة", "On hold", p => p.status === "on_hold"], completed: ["المكتملة", "Completed", p => p.status === "completed"],
     high_risk: ["عالية المخاطر", "High risk", p => p.metrics.risk_counts.critical > 0 && p.status !== "completed"], over_budget: ["تجاوزت الميزانية", "Over budget", p => p.metrics.over_budget || (p.metrics.evm.CPI ?? 1) < 0.9],
@@ -52,7 +53,7 @@ export function Projects() {
     <div className="row" style={{ marginBlockEnd: 12 }}>
       {Object.entries(F).map(([k, [a, e]]) => <button key={k} className={`btn sm ${f === k ? "primary" : ""}`} onClick={() => setSp(k === "all" ? {} : { f: k })} aria-pressed={f === k}>{T(a, e)}{q.data && ` ${q.data.filter(F[k][2]).length}`}</button>)}
       <span className="grow" /><input className="input" style={{ width: 220 }} placeholder={T("ابحث بالاسم أو الرمز…", "Filter by name or code…")} value={text} onChange={e => setText(e.target.value)} aria-label={T("تصفية", "Filter")} /></div>
-    <section className="panel"><Async q={q}>{rows => { const list = rows.filter((F[f] || F.all)[2]).filter((p: any) => !text || `${p.name_ar} ${p.name_en} ${p.code}`.toLowerCase().includes(text.toLowerCase()));
+    <section className="panel"><Async q={q}>{rows => { const list = rows.filter((F[f] || F.all)[2]).filter((p: any) => !needle || `${p.name_ar} ${p.name_en} ${p.code}`.toLowerCase().includes(needle));
       return list.length === 0 ? <div className="empty">{T("لا مشاريع تطابق هذه التصفية.", "No projects match this filter.")}</div> : <div className="tbl-wrap"><table className="tbl"><thead><tr><th>{T("المشروع", "Project")}</th><th>{T("الحالة", "Status")}</th><th>{T("الوضع", "Health")}</th><th>{T("مدير المشروع", "Manager")}</th>
         <th style={{ width: 160 }}>{T("الإنجاز", "Progress")}</th><th className="num">SPI</th><th className="num">CPI</th><th className="num">{T("الميزانية", "Budget")}</th><th className="num">{T("المصروف", "Actual")}</th><th>{T("النهاية", "End")}</th><th className="num">{T("مخاطر حرجة", "Critical risks")}</th></tr></thead>
         <tbody>{list.map((p: any) => <tr key={p.id} className="click" onClick={() => nav(`/projects/${p.id}`)}><td><Link to={`/projects/${p.id}`} onClick={e => e.stopPropagation()} style={{ fontWeight: 600, color: "var(--ink)", textDecoration: "none" }}>{N(p)}</Link><div className="small muted"><bdi>{p.code}</bdi></div></td>

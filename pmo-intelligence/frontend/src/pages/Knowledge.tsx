@@ -36,7 +36,7 @@ export function Answer({ msg, title }: { msg: any; title?: string }) {
   const [view, setView] = useState<any>(null);
   const cites: any[] = msg.citations || [];
   const exportAs = async (format: string) => {
-    try { saveBlob(await api.blob("/export", { format, lang, title: title || "PMO Intelligence", text: (msg.blocks || []).map((b: any) => b.text).join("\n"), citations: cites,
+    try { saveBlob(await api.blob("/export", { format, lang, title: title || "AI-Powered PMO Platform", text: (msg.blocks || []).map((b: any) => b.text).join("\n"), citations: cites,
       tables: (msg.blocks || []).filter((b: any) => b.table).map((b: any) => ({ title: b.text, ...b.table })) }), `answer.${format}`); } catch (e) { fail(e); }
   };
   return <div className="msg">

@@ -1,4 +1,4 @@
-# PMO INTELLIGENCE
+# AI-Powered PMO Platform
 
 **From Project Initiation to Strategic Value Realization**
 

@@ -78,7 +78,7 @@ def logout(db: Session = DB, user=User):
 def mfa_setup(db: Session = DB, user=User):
     user.mfa_secret = base64.b32encode(os.urandom(20)).decode()
     db.commit()
-    return {"secret": user.mfa_secret, "uri": f"otpauth://totp/PMO%20Intelligence:{user.email}?secret={user.mfa_secret}&issuer=PMO%20Intelligence"}
+    return {"secret": user.mfa_secret, "uri": f"otpauth://totp/AI-Powered%20PMO%20Platform:{user.email}?secret={user.mfa_secret}&issuer=AI-Powered%20PMO%20Platform"}
 
 
 @router.post("/auth/mfa/enable")
@@ -667,7 +667,7 @@ def export_text(data: dict = Body(...), user=User):
         sections.append({"key": "sources", "kind": "table", "title": "المصادر" if lang == "ar" else "Sources",
                          "head": ["#", "الملف" if lang == "ar" else "File", "الصفحة" if lang == "ar" else "Page", "القسم" if lang == "ar" else "Section", "المقتطف" if lang == "ar" else "Excerpt"],
                          "rows": [[c.get("n"), c.get("document"), c.get("page"), c.get("section"), c.get("snippet")] for c in cites]})
-    rep = {"type": "export", "lang": lang, "title": data.get("title") or "PMO Intelligence", "scope": data.get("scope", ""), "period": "",
+    rep = {"type": "export", "lang": lang, "title": data.get("title") or "AI-Powered PMO Platform", "scope": data.get("scope", ""), "period": "",
            "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"), "summary": [l for l in (data.get("text") or "").split("\n") if l.strip()],
            "summary_label": "الإجابة" if lang == "ar" else "Answer", "comment": "", "comment_label": "", "sections": sections}
     fn, mime = reports.RENDER[fmt]

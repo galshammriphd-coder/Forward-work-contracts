@@ -41,7 +41,7 @@ export default function Initiation() {
     if (step === 2 && !d.activities) await gen("wbs"); if (step === 3 && !d.schedule) await gen("schedule"); if (step === 4 && !d.risks) await gen("risks"); if (step === 5 && !d.documents) await gen("documents");
     setStep(Math.min(8, step + 1));
   };
-  const Bar = () => <div className="row" style={{ justifyContent: "space-between", marginBlockStart: 16 }}>
+  const bar = <div className="row" style={{ justifyContent: "space-between", marginBlockStart: 16 }}>
     <button className="btn" disabled={step <= 1} onClick={() => setStep(step - 1)}><ChevronRight className="flip" style={{ transform: "scaleX(-1)" }} />{T("السابق", "Back")}</button>
     {step < 8 && <button className="btn primary" disabled={!!busy} onClick={next}>{busy ? <i className="spin" /> : null}{step >= 2 && step <= 5 && !ready[step + 1] ? T("ولّد ثم تابع", "Generate and continue") : T("التالي", "Next")}<ChevronLeft className="flip" style={{ transform: "scaleX(-1)" }} /></button>}</div>;
   const actRow = (i: number, key: string, val: any) => { const a = [...d.activities]; a[i] = { ...a[i], [key]: val, tag: "user" }; return a; };
@@ -68,7 +68,7 @@ export default function Initiation() {
       {d.missing.length > 0 ? <div className="note warning"><AlertTriangle /><div><b>{T("بيانات ناقصة في الميثاق", "Data missing from the charter")}</b><div>{d.missing.map((m: string) => T(...(FIELD[m] || [m, m]))).join(T("، ", ", "))}</div>
         <div className="small">{T("لن يختلقها النظام. أدخلها في الخطوة التالية أو اتركها ناقصة.", "The system will not invent them. Enter them in the next step or leave them missing.")}</div></div></div> : <div className="note"><Check />{T("كل البيانات الأساسية موجودة في الميثاق.", "All key data is present in the charter.")}</div>}
       {d.conflicts.map((c: any, i: number) => <div key={i} className="note critical"><AlertTriangle /><div><b>{T("تعارض داخل الميثاق", "Conflict inside the charter")} — {T(...(FIELD[c.field] || [c.field, c.field]))}</b><div>{T(c.message_ar, c.message_en)}</div></div></div>)}
-      <Bar /></div></section>}
+      {bar}</div></section>}
 
     {s && step === 2 && <div className="stack"><section className="panel"><header><div><h2>{T("ملف المشروع", "Project profile")}</h2><p>{T("عدّل أي قيمة خاطئة. ما تعدله يُوسم «مدخلة».", "Correct any wrong value. What you change is tagged “User defined”.")}</p></div></header>
       <div className="tbl-wrap"><table className="tbl"><thead><tr><th style={{ width: 180 }}>{T("البند", "Item")}</th><th>{T("القيمة", "Value")}</th><th>{T("التصنيف", "Tag")}</th><th>{T("المصدر في الميثاق", "Source in the charter")}</th></tr></thead>
@@ -83,7 +83,7 @@ export default function Initiation() {
           : <div className="body muted small">{T("غير مذكور في الميثاق.", "Not stated in the charter.")}</div>}</section>)}</div>
       <section className="panel"><div className="body row">{s.approvals.profile ? <span className="tag good"><Check />{T("اعتُمدت البيانات المستخرجة", "Extracted data approved")}</span> :
         <button className="btn" disabled={!!busy || done} onClick={() => approve("profile").then(() => toast(T("اعتُمدت البيانات، وولّدت الأتمتة هيكل العمل", "Data approved; automation generated the WBS")))}><Check />{T("اعتمد البيانات المستخرجة", "Approve extracted data")}</button>}
-        <span className="small muted">{T("اعتماد هذه البيانات يشغّل قاعدة الأتمتة «عند اعتماد بيانات الميثاق: أنشئ WBS».", "Approving this data fires the automation rule “On charter data approved: generate the WBS”.")}</span></div></section><Bar /></div>}
+        <span className="small muted">{T("اعتماد هذه البيانات يشغّل قاعدة الأتمتة «عند اعتماد بيانات الميثاق: أنشئ WBS».", "Approving this data fires the automation rule “On charter data approved: generate the WBS”.")}</span></div></section>{bar}</div>}
 
     {s && step === 3 && d.activities && <div className="stack">
       {(d.wbs_assumptions || []).map((a: string, i: number) => <div key={i} className="note warning"><AlertTriangle />{a}</div>)}
@@ -97,7 +97,7 @@ export default function Initiation() {
               <td>{sum ? <span className="muted">—</span> : <input className="input inline num" type="number" min={1} disabled={done} defaultValue={a.duration_days} key={a.duration_days} onBlur={e => +e.target.value !== a.duration_days && patch({ activities: actRow(i, "duration_days", Math.max(1, +e.target.value)) })} aria-label={T("المدة", "Duration")} />}</td>
               <td className="small muted"><bdi>{a.deps.map((x: any) => `${d.activities.find((y: any) => y.key === x.pred)?.wbs_code || "?"} ${x.type}${x.lag ? (x.lag > 0 ? "+" : "") + x.lag : ""}`).join(", ") || "—"}</bdi></td>
               <td className="num">{money(a.estimated_cost)}</td><td className="small">{a.completion_criteria || "—"}</td><td><Src v={a.tag} /></td>
-              <td className="act">{!done && !sum && <button className="btn ghost sm icon danger" aria-label={T("احذف النشاط", "Remove activity")} onClick={() => { const preds = a.deps; patch({ activities: d.activities.filter((x: any) => x.key !== a.key).map((x: any) => ({ ...x, deps: x.deps.flatMap((dp: any) => dp.pred === a.key ? preds : [dp]) })) }); }}><Trash2 /></button>}</td></tr>; })}</tbody></table></div></section><Bar /></div>}
+              <td className="act">{!done && !sum && <button className="btn ghost sm icon danger" aria-label={T("احذف النشاط", "Remove activity")} onClick={() => { const preds = a.deps; patch({ activities: d.activities.filter((x: any) => x.key !== a.key).map((x: any) => ({ ...x, deps: x.deps.flatMap((dp: any) => dp.pred === a.key ? preds : [dp]) })) }); }}><Trash2 /></button>}</td></tr>; })}</tbody></table></div></section>{bar}</div>}
 
     {s && step === 4 && d.schedule && <div className="stack">
       {d.schedule.warnings.map((w: string, i: number) => <div key={i} className="note warning"><AlertTriangle />{w}</div>)}
@@ -107,7 +107,7 @@ export default function Initiation() {
         <div className="tbl-wrap" style={{ maxHeight: 420 }}><table className="tbl"><thead><tr><th>WBS</th><th>{T("النشاط", "Activity")}</th><th>{T("البداية", "Start")}</th><th>{T("النهاية", "End")}</th><th className="num">{T("المدة", "Days")}</th><th className="num">{T("الفائض", "Float")}</th><th>{T("المسار الحرج", "Critical path")}</th></tr></thead>
           <tbody>{d.activities.map((a: any) => <tr key={a.key}><td className="num">{a.wbs_code}</td><td style={{ paddingInlineStart: a.parent ? 30 : 12, fontWeight: a.is_summary ? 600 : 400 }}>{a.name}</td><td>{date(a.planned_start)}</td><td>{date(a.planned_end)}</td><td className="num">{a.is_summary ? "—" : a.duration_days}</td><td className="num">{a.total_float}</td><td>{a.is_critical && <span className="tag critical">{T("حرج", "Critical")}</span>}</td></tr>)}</tbody></table></div></section>
       <section className="panel"><header><h2>{T("المعالم الرئيسية", "Milestones")}</h2></header><div className="tbl-wrap"><table className="tbl"><thead><tr><th>{T("المعلم", "Milestone")}</th><th>{T("التاريخ المستهدف", "Target date")}</th><th>{T("التصنيف", "Tag")}</th><th>{T("المصدر", "Source")}</th></tr></thead>
-        <tbody>{d.milestones.map((m: any, i: number) => <tr key={i}><td>{m.name}</td><td>{m.target_date ? date(m.target_date) : <span className="tag warning">{T("بلا تاريخ في الميثاق", "No date in the charter")}</span>}</td><td><Src v={m.tag} /></td><td><SrcRef s={m.source} /></td></tr>)}</tbody></table></div></section><Bar /></div>}
+        <tbody>{d.milestones.map((m: any, i: number) => <tr key={i}><td>{m.name}</td><td>{m.target_date ? date(m.target_date) : <span className="tag warning">{T("بلا تاريخ في الميثاق", "No date in the charter")}</span>}</td><td><Src v={m.tag} /></td><td><SrcRef s={m.source} /></td></tr>)}</tbody></table></div></section>{bar}</div>}
 
     {s && step === 5 && d.risks && <div className="stack"><section className="panel"><header><div><h2>{T("سجل المخاطر الأولي", "Initial risk register")}</h2><p>{T("مخاطر الميثاق مستخرجة كما هي. الباقي مقترح من قيود الميثاق وافتراضاته ومن بنية الجدول، على مستويات المشروع والمرحلة والمخرج وحزمة العمل والنشاط.", "Charter risks are extracted as written. The rest are proposed from the charter's constraints and assumptions and from the schedule, at project, phase, deliverable, work-package and activity level.")}</p></div>
       <button className="btn sm" disabled={!!busy || done} onClick={() => gen("risks")}><RefreshCw />{T("ولّد من جديد", "Regenerate")}</button></header>
@@ -117,11 +117,11 @@ export default function Initiation() {
             <td style={{ minWidth: 240 }}>{r.title}{r.rating_estimated && <div className="small" style={{ color: "var(--warning)" }}>{T("الميثاق لم يحدد الاحتمالية والأثر؛ القيمتان تقدير يحتاج تأكيدك.", "The charter gives no probability or impact; both values are estimates for you to confirm.")}</div>}</td><td className="small">{r.category}</td>
             {["probability", "impact"].map(k => <td key={k}><select className="input inline" disabled={done} value={r[k]} onChange={e => setR(k, +e.target.value)} aria-label={k}>{[1, 2, 3, 4, 5].map(n => <option key={n}>{n}</option>)}</select></td>)}
             <td className="num strong">{r.probability * r.impact}</td><td><Status v={r.probability * r.impact <= 4 ? "low" : r.probability * r.impact <= 9 ? "moderate" : r.probability * r.impact <= 14 ? "high" : "critical"} /></td><td className="small" style={{ minWidth: 220 }}>{r.mitigation || <span className="muted">—</span>}</td><td><Src v={r.tag} /></td>
-            <td className="act">{!done && <button className="btn ghost sm icon danger" aria-label={T("احذف الخطر", "Remove risk")} onClick={() => patch({ risks: d.risks.filter((_: any, j: number) => j !== i) })}><Trash2 /></button>}</td></tr>; })}</tbody></table></div></section><Bar /></div>}
+            <td className="act">{!done && <button className="btn ghost sm icon danger" aria-label={T("احذف الخطر", "Remove risk")} onClick={() => patch({ risks: d.risks.filter((_: any, j: number) => j !== i) })}><Trash2 /></button>}</td></tr>; })}</tbody></table></div></section>{bar}</div>}
 
     {s && step === 6 && d.documents && <div className="stack"><section className="panel"><header><div><h2>{T("مسودات وثائق إدارة المشروع", "Draft project management documents")}</h2><p>{T(`${d.documents.length} وثيقة بُنيت من البيانات التي راجعتها. تُحفظ كمسودات في قاعدة معرفة المشروع عند التفعيل.`, `${d.documents.length} documents built from the data you reviewed. They are stored as drafts in the project knowledge base on activation.`)}</p></div>
       <button className="btn sm" disabled={!!busy || done} onClick={() => gen("documents")}><RefreshCw />{T("أعد توليد الوثائق", "Regenerate documents")}</button></header>
-      <div className="tbl-wrap"><table className="tbl"><tbody>{d.documents.map((x: any) => <tr key={x.key} className="click" onClick={() => setDoc(x)}><td>{x.title}</td><td className="small muted">{num(x.content.length)} {T("حرفاً", "characters")}</td><td><Src v={x.tag} /></td><td className="act"><button className="btn ghost sm">{T("اعرض وعدّل", "View and edit")}</button></td></tr>)}</tbody></table></div></section><Bar /></div>}
+      <div className="tbl-wrap"><table className="tbl"><tbody>{d.documents.map((x: any) => <tr key={x.key} className="click" onClick={() => setDoc(x)}><td>{x.title}</td><td className="small muted">{num(x.content.length)} {T("حرفاً", "characters")}</td><td><Src v={x.tag} /></td><td className="act"><button className="btn ghost sm">{T("اعرض وعدّل", "View and edit")}</button></td></tr>)}</tbody></table></div></section>{bar}</div>}
 
     {s && step === 7 && d.documents && <div className="stack"><section className="panel"><header><div><h2>{T("المراجعة والاعتماد", "Review and approval")}</h2><p>{T("لا تتحول مخرجات الذكاء الاصطناعي إلى بيانات معتمدة إلا باعتمادك لكل قسم.", "AI output becomes approved data only when you approve each section.")}</p></div></header>
       <div className="tbl-wrap"><table className="tbl"><thead><tr><th>{T("القسم", "Section")}</th><th>{T("المحتوى", "Contents")}</th><th>{T("الحالة", "Status")}</th><th /></tr></thead><tbody>{s.sections.map((k: string) => { const ap = s.approvals[k];
@@ -129,7 +129,7 @@ export default function Initiation() {
           risks: `${d.risks?.length} ${T("خطراً", "risks")}`, budget: d.profile.budget ? money(d.profile.budget.value) : T("لا ميزانية في الميثاق", "No budget in the charter"), documents: `${d.documents.length} ${T("وثيقة", "documents")}` };
         return <tr key={k}><td className="strong">{T(...SECTION[k])}</td><td>{what[k]}</td><td>{ap ? <span className="tag good"><Check />{T("اعتمده", "Approved by")} <bdi>{ap.by}</bdi></span> : <span className="tag warning">{T("بانتظار اعتمادك", "Awaiting your approval")}</span>}</td>
           <td className="act">{!done && (ap ? <button className="btn ghost sm" onClick={() => approve(k, false)}>{T("تراجع عن الاعتماد", "Withdraw approval")}</button> : <button className="btn sm primary" disabled={!!busy} onClick={() => approve(k)}><Check />{T("اعتمد", "Approve")}</button>)}</td></tr>; })}</tbody></table></div>
-      <div className="body row"><Src v="extracted" /><Src v="ai" /><Src v="user" /><Src v="calculated" /><span className="small muted">{T("كل معلومة في المسودة تحمل أحد هذه التصنيفات الأربعة.", "Every item in the draft carries one of these four tags.")}</span></div></section><Bar /></div>}
+      <div className="body row"><Src v="extracted" /><Src v="ai" /><Src v="user" /><Src v="calculated" /><span className="small muted">{T("كل معلومة في المسودة تحمل أحد هذه التصنيفات الأربعة.", "Every item in the draft carries one of these four tags.")}</span></div></section>{bar}</div>}
 
     {s && step === 8 && <section className="panel"><header><h2>{done ? T("فُعّل المشروع", "Project activated") : T("تفعيل المشروع", "Activate the project")}</h2></header><div className="body stack">
       {done ? <><div className="note"><Check />{T("أُنشئ المشروع في قاعدة البيانات بكل أنشطته ومخاطره ووثائقه، وحُفظ خط الأساس الأول.", "The project was created in the database with all its activities, risks and documents, and the first baseline was saved.")}</div>
@@ -141,7 +141,7 @@ export default function Initiation() {
         <div><button className="btn primary" disabled={!!busy || s.sections.some((k: string) => !s.approvals[k])} onClick={async () => { setBusy("activate"); setErr("");
           try { const r = await api.post(`/initiation/${s.id}/activate`, Object.fromEntries(Object.entries(place).map(([k, v]) => [k, v ? +(v as string) : null]))); toast(T("أُنشئ المشروع", "Project created")); nav(`/projects/${r.project_id}`); } catch (e: any) { e.message === "NETWORK" ? fail(e) : setErr(e.message); } finally { setBusy(""); } }}>
           {busy === "activate" ? <i className="spin" /> : <Rocket />}{T("أنشئ المشروع", "Create the project")}</button></div></>}
-      <Bar /></div></section>}
+      {bar}</div></section>}
 
     {doc && <DocEditor doc={doc} readOnly={done} onClose={() => setDoc(null)} onSave={content => patch({ documents: d.documents.map((x: any) => x.key === doc.key ? { ...x, content, tag: "user" } : x) })} />}
   </div>;

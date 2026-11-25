@@ -1,4 +1,4 @@
-"""PMO INTELLIGENCE — application entry point."""
+"""AI-Powered PMO Platform — application entry point."""
 from __future__ import annotations
 
 import threading
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     stop.set()
 
 
-app = FastAPI(title="PMO INTELLIGENCE", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="AI-Powered PMO Platform", version="1.0.0", lifespan=lifespan)
 app.include_router(api.router)
 app.include_router(api_crud.router)
 
