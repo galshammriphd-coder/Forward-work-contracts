@@ -4,6 +4,7 @@ import { ChevronLeft, DoorOpen, Pencil, Play, Trash2, UserPlus, X } from "lucide
 import { api, useApp, useLoad } from "../lib/core";
 import { Async, Confirm, FormModal, Progress, Register, Src, Status, Tabs } from "../lib/ui";
 import { AlertList } from "./Dashboard";
+import { Gauge, RiskMatrix, VBars } from "../lib/charts";
 import Schedule, { Planning } from "./Schedule";
 import Risks from "./Risks";
 import Finance from "./Finance";
@@ -51,26 +52,46 @@ function Overview({ p, reload }: { p: any; reload: () => void }) {
   const [member, setMember] = useState("");
   const write = can("project.write");
   const gate = (ph: any) => api.post(`/phases/${ph.id}/gate`).then(() => { toast(T("أُرسل طلب اعتماد البوابة", "Gate approval requested")); reload(); }).catch(fail);
+  const hm = useLoad<any>(`/risks/heatmap?project_id=${p.id}`);
+  const fin = useLoad<any>(can("finance.read") ? `/projects/${p.id}/finance` : null);
+  const nav = useNavigate();
+  const t0 = p.start_date ? +new Date(p.start_date) : 0, t1 = m.forecast_finish ? Math.max(+new Date(m.forecast_finish), +new Date(p.end_date || m.forecast_finish)) : 0;
+  const pos = (d: string) => (t1 > t0 ? Math.max(0, Math.min(100, ((+new Date(d) - t0) / (t1 - t0)) * 100)) : 0);
   const info: [string, any][] = [[T("الراعي", "Sponsor"), p.sponsor], [T("مدير المشروع", "Project manager"), N(p, "manager_name")], [T("مالك الأعمال", "Business owner"), p.business_owner], [T("البداية", "Start"), date(p.start_date)], [T("النهاية", "End"), date(p.end_date)],
     [T("الانتهاء المتوقع", "Forecast finish"), date(m.forecast_finish)], [T("الأولوية", "Priority"), <Status v={p.priority} />], [T("طريقة الإنشاء", "Created"), p.created_from === "charter" ? T("من ميثاق بالمعالج الذكي", "From a charter, by the wizard") : T("يدوياً", "Manually")]];
   return <div className="grid split" style={{ alignItems: "start" }}>
     <div className="stack">
       {p.needs_intervention && <div className="note critical"><div><b>{T("يتطلب تدخلاً تنفيذياً", "Needs executive intervention")}</b><div>{p.intervention_reason}</div></div></div>}
+      <div className="grid g4w">
+        <section className="panel"><header><h2>{T("الإنجاز", "Progress")}</h2></header><div className="body"><Gauge value={m.progress} marker={m.planned_progress} color="var(--c-actual)" sub={T(`الخط = المخطط ${pct(m.planned_progress, 1)}`, `Line = planned ${pct(m.planned_progress, 1)}`)} /></div></section>
+        <section className="panel"><header><h2>{T("الميزانية المصروفة", "Used budget")}</h2></header><div className="body"><Gauge value={m.actual} max={m.budget || 1} ends color={m.over_budget ? "var(--s-critical)" : "var(--c-lime)"} fmt={v => money(v).replace(/ [^ ]+$/, "")} marker={Math.min(m.budget, m.actual + m.committed)} sub={T(`من ${money(m.budget)}؛ الخط = مع الالتزامات`, `Of ${money(m.budget)}; line = with commitments`)} /></div></section>
+        <section className="panel"><header><h2>{T("أداء الجدول SPI", "Schedule performance (SPI)")}</h2></header><div className="body"><Gauge value={e.SPI} max={1.5} fmt={v => num(v, 2)} marker={1} color={e.SPI != null && e.SPI < 0.9 ? "var(--s-critical)" : "var(--c1)"} sub={T("الخط = 1.00 (وفق الخطة)", "Line = 1.00 (on plan)")} /></div></section>
+        <section className="panel"><header><h2>{T("أداء التكلفة CPI", "Cost performance (CPI)")}</h2></header><div className="body"><Gauge value={e.CPI} max={1.5} fmt={v => num(v, 2)} marker={1} color={e.CPI != null && e.CPI < 0.9 ? "var(--s-critical)" : "var(--c-violet)"} sub={T("الخط = 1.00 (وفق الميزانية)", "Line = 1.00 (on budget)")} /></div></section>
+      </div>
+      <div className="grid gates">
+        <section className="panel"><header><h2>{T("الخط الزمني للمراحل", "Gates timeline")}</h2></header><div className="body">
+          {p.phases.length === 0 || !t0 ? <p className="muted">{T("لا مراحل بعد.", "No phases yet.")}</p> : <div className="timeline" dir="ltr">
+            <div className="tl-ends"><span>{date(p.start_date)}</span><span>{date(m.forecast_finish)}</span></div>
+            <div className="tl-bar">{p.phases.map((ph: any) => ph.start_date && <i key={ph.id} className={`tl-${ph.status}`} title={ph.name} style={{ left: `${pos(ph.start_date)}%`, width: `${Math.max(1.5, pos(ph.end_date) - pos(ph.start_date))}%` }} />)}
+              <em style={{ left: `${pos(m.data_date)}%` }}><span>{T("اليوم", "Today")}</span></em></div>
+            <div className="tl-names">{p.phases.map((ph: any) => ph.start_date && <span key={ph.id} style={{ left: `${pos(ph.start_date)}%`, width: `${Math.max(1.5, pos(ph.end_date) - pos(ph.start_date))}%` }} dir="auto">{ph.name}</span>)}</div></div>}</div></section>
+        <section className="panel"><header><h2>{T("بوابات الاعتماد", "Gates")}</h2></header>
+          {p.phases.length === 0 ? <div className="empty">{T("لا مراحل. أنشئها من التخطيط أو بالمعالج.", "No phases. Create them under Planning or with the wizard.")}</div> :
+            <div className="tbl-wrap"><table className="tbl cells"><thead><tr><th>{T("المرحلة", "Phase")}</th><th>{T("الحالة", "Status")}</th><th>{T("البوابة", "Gate")}</th><th>{T("النهاية", "End")}</th></tr></thead>
+              <tbody>{p.phases.map((ph: any) => <tr key={ph.id}><td>{ph.name}</td><td><Status v={ph.status} /></td>
+                <td>{write && ph.gate_status === "pending" && ph.status === "completed" ? <button className="btn sm" onClick={() => gate(ph)}><DoorOpen />{T("اطلب الاعتماد", "Request approval")}</button> : <Status v={ph.gate_status} />}</td><td>{date(ph.end_date)}</td></tr>)}</tbody></table></div>}</section>
+      </div>
+      <div className="grid g2">
+        <section className="panel"><header><h2>{T("مخاطر المشروع", "Project risks")}</h2><button className="btn sm" onClick={() => nav(`/projects/${p.id}/risks`)}>{T("افتح السجل", "Open register")}</button></header><div className="body"><Async q={hm}>{d => <RiskMatrix grid={d.grid} onPick={() => nav(`/projects/${p.id}/risks`)} />}</Async></div></section>
+        {fin.data ? <section className="panel"><header><h2>{T("التكلفة المخططة مقابل الفعلية حسب المرحلة", "Budgeted against actual cost by phase")}</h2></header><div className="body">
+          <VBars names={[T("المخطط", "Budget"), T("الفعلي", "Actual")]} fmt={v => money(v).replace(/ [^ ]+$/, "")} rows={fin.data.by_phase.map((x: any) => ({ label: x.phase, a: x.planned, b: x.actual }))} /></div></section> : null}
+      </div>
       <div className="kpis">
-        <div className="kpi" style={{ cursor: "default" }}><span>{T("الإنجاز", "Progress")}</span><b>{pct(m.progress, 1)}</b><small>{T("المخطط", "Planned")} {pct(m.planned_progress, 1)}</small></div>
-        <div className="kpi" style={{ cursor: "default" }}><span>SPI</span><b className={e.SPI != null && e.SPI < 0.9 ? "critical" : ""}>{num(e.SPI, 2)}</b><small>{T("أداء الجدول", "Schedule performance")}</small></div>
-        <div className="kpi" style={{ cursor: "default" }}><span>CPI</span><b className={e.CPI != null && e.CPI < 0.9 ? "critical" : ""}>{num(e.CPI, 2)}</b><small>{T("أداء التكلفة", "Cost performance")}</small></div>
-        <div className="kpi" style={{ cursor: "default" }}><span>{T("المصروف من الميزانية", "Spent of budget")}</span><b className={m.over_budget ? "critical" : ""}>{money(m.actual)}</b><small>{T("من", "of")} {money(m.budget)}</small></div>
         <div className="kpi" style={{ cursor: "default" }}><span>{T("أنشطة متأخرة", "Late activities")}</span><b className={m.late_activities ? "warning" : ""}>{num(m.late_activities)}</b><small>{num(m.critical_late)} {T("على المسار الحرج", "on the critical path")}</small></div>
         <div className="kpi" style={{ cursor: "default" }}><span>{T("مخاطر مفتوحة", "Open risks")}</span><b className={m.risk_counts.critical ? "critical" : ""}>{num(m.open_risks)}</b><small>{num(m.risk_counts.critical)} {T("حرجة", "critical")}</small></div>
         <div className="kpi" style={{ cursor: "default" }}><span>{T("انحراف الانتهاء", "Finish variance")}</span><b className={m.schedule_variance_days > 0 ? "critical" : ""}>{num(m.schedule_variance_days)} {T("يوم", "days")}</b><small>{T("مقابل خط الأساس", "Against baseline")}</small></div>
         <div className="kpi" style={{ cursor: "default" }}><span>{T("الوثائق", "Documents")}</span><b>{num(p.counts.documents)}</b><small>{num(p.counts.activities)} {T("نشاطاً", "activities")}</small></div>
       </div>
-      <section className="panel"><header><div><h2>{T("المراحل وبوابات الاعتماد", "Phases and stage gates")}</h2></div></header>
-        {p.phases.length === 0 ? <div className="empty">{T("لا مراحل. أنشئها من تبويب التخطيط أو بالمعالج الذكي.", "No phases. Create them under Planning or with the wizard.")}</div> :
-          <div className="tbl-wrap"><table className="tbl"><thead><tr><th>{T("المرحلة", "Phase")}</th><th>{T("من", "From")}</th><th>{T("إلى", "To")}</th><th>{T("الحالة", "Status")}</th><th>{T("البوابة", "Gate")}</th><th /></tr></thead>
-            <tbody>{p.phases.map((ph: any) => <tr key={ph.id}><td>{ph.name}</td><td>{date(ph.start_date)}</td><td>{date(ph.end_date)}</td><td><Status v={ph.status} /></td><td><Status v={ph.gate_status} /></td>
-              <td className="act">{write && ph.gate_status === "pending" && ph.status === "completed" && <button className="btn sm" onClick={() => gate(ph)}><DoorOpen />{T("اطلب اعتماد البوابة", "Request gate approval")}</button>}</td></tr>)}</tbody></table></div>}</section>
       <section className="panel"><header><h2>{T("معلومات المشروع", "Project information")}</h2></header><div className="body stack">
         <p dir="auto">{p.description || <span className="muted">{T("لا وصف.", "No description.")}</span>}</p>
         <div className="grid g4 small">{info.map(([l, v]) => <div key={l}><div className="muted">{l}</div><div className="strong">{v || "—"}</div></div>)}</div>

@@ -1,6 +1,6 @@
 import { ComponentType, lazy, ReactNode, Suspense, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { Bell, BookOpenCheck, Bot, Briefcase, CalendarRange, CircleDollarSign, FileStack, FileUp, FolderKanban, Gauge, Languages, Layers, ListTree, LogOut, Menu, MessagesSquare, Moon, Scale, Search, Settings, ShieldAlert, Sun, Target, Users, Workflow, FileBarChart } from "lucide-react";
+import { Bell, BookOpenCheck, Bot, Briefcase, CalendarRange, CircleDollarSign, FileStack, FileUp, FolderKanban, Gauge, Languages, Layers, ListTree, LogOut, Menu, Plus, MessagesSquare, Moon, Scale, Search, Settings, ShieldAlert, Sun, Target, Users, Workflow, FileBarChart } from "lucide-react";
 import { api, hasToken, setToken, store, useApp, useLoad } from "./lib/core";
 import { Loading } from "./lib/ui";
 
@@ -111,6 +111,8 @@ export default function App() {
   const { T, N, user, setUser, lang, setLang, theme, setTheme, can } = useApp();
   const [boot, setBoot] = useState(hasToken());
   const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(() => store.get("pmo_menu") === "pinned");
+  const go = useNavigate();
   const loc = useLocation();
   useEffect(() => { if (hasToken()) api.get("/auth/me").then(setUser).catch(() => {}).finally(() => setBoot(false)); const out = () => setUser(null); window.addEventListener("pmo-logout", out); return () => window.removeEventListener("pmo-logout", out); }, []);  // eslint-disable-line
   useEffect(() => { setOpen(false); window.scrollTo(0, 0); }, [loc.pathname]);
@@ -125,7 +127,7 @@ export default function App() {
       ["/documents", "وثائق المشروع", "Project Documents", FileStack, can("docs.read")], ["/knowledge", "معرفة المشروع والمحادثة", "Project Knowledge & AI Chat", MessagesSquare, can("chat.use")]]],
     ["pmo", ["مكتب إدارة المشاريع", "The PMO"], [["/governance", "حوكمة المكتب", "PMO Governance", Scale], ["/automation", "سير العمل والأتمتة", "Workflow & Automation", Workflow], ["/reports", "التقارير والتحليلات", "Reports & Analytics", FileBarChart, can("report.read")],
       ["/copilot", "المساعد الذكي", "AI PMO Copilot", Bot, can("copilot.use")], ["/lessons", "الدروس المستفادة", "Lessons Learned", BookOpenCheck], ["/admin", "الإدارة والإعدادات", "Administration & Settings", Settings]]]];
-  return <div className="shell">
+  return <div className={`shell ${pinned ? "pinned" : ""}`}>
     {open && <div className="scrim" onClick={() => setOpen(false)} />}
     <nav className={`rail ${open ? "open" : ""}`} aria-label={T("القائمة الرئيسية", "Main menu")}>
       <Link to="/" className="brand" style={{ color: "inherit", textDecoration: "none" }}><Mark /><div><b>{APP_NAME}</b></div></Link>
@@ -133,8 +135,11 @@ export default function App() {
     </nav>
     <div className="main">
       <header className="top no-print"><a href="#content" className="btn ghost sm" style={{ position: "absolute", insetInlineStart: -9999 }} onFocus={e => (e.currentTarget.style.insetInlineStart = "8px")} onBlur={e => (e.currentTarget.style.insetInlineStart = "-9999px")}>{T("انتقل إلى المحتوى", "Skip to content")}</a>
-        <button className="btn ghost icon menu-btn" onClick={() => setOpen(true)} aria-label={T("افتح القائمة", "Open menu")}><Menu /></button>
-        <GlobalSearch /><span className="grow" />
+        <button className="btn ghost icon" onClick={() => { if (window.matchMedia("(max-width: 960px)").matches) setOpen(true); else { store.set("pmo_menu", pinned ? null : "pinned"); setPinned(!pinned); } }}
+          aria-label={T("القائمة", "Menu")} aria-pressed={pinned} title={pinned ? T("اطوِ القائمة", "Collapse menu") : T("ثبّت القائمة مفتوحة", "Keep menu open")}><Menu /></button>
+        <GlobalSearch />
+        {can("initiation.use") || can("project.write") ? <button className="btn create" onClick={() => go(can("initiation.use") ? "/initiation" : "/projects")}><Plus />{T("إنشاء", "Create")}</button> : null}
+        <span className="grow" />
         <button className="btn ghost sm" onClick={() => setLang(lang === "ar" ? "en" : "ar")}><Languages /><span lang={lang === "ar" ? "en" : "ar"}>{lang === "ar" ? "English" : "العربية"}</span></button>
         <button className="btn ghost icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? T("الوضع الفاتح", "Light mode") : T("الوضع الداكن", "Dark mode")}>{theme === "dark" ? <Sun /> : <Moon />}</button>
         <Bell_ />

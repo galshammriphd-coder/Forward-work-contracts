@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { AlertOctagon, AlertTriangle, BellRing, Check, Info, RefreshCw } from "lucide-react";
 import { api, useApp, useLoad } from "../lib/core";
 import { Async, Status } from "../lib/ui";
-import { HBars, Lines, PairBars, RiskMatrix, Segments } from "../lib/charts";
+import { Gauge, HBars, Lines, PairBars, Ring, RiskMatrix, Segments, VBars } from "../lib/charts";
 
 export const CAT: Record<string, [string, string]> = { schedule: ["الجدول", "Schedule"], financial: ["المالية", "Financial"], risk: ["المخاطر", "Risk"], performance: ["الأداء", "Performance"], governance: ["الحوكمة", "Governance"] };
 const SEV_ICON: Record<string, any> = { critical: AlertOctagon, warning: AlertTriangle, advisory: BellRing, informational: Info };
@@ -43,23 +43,39 @@ export default function Dashboard() {
       const live = P.filter((p: any) => p.status !== "completed" && p.status !== "planned");
       return <div className="grid split" style={{ alignItems: "start" }}>
         <div className="stack">
+          <div className="cards">
+            <button className="card c-blue" onClick={() => go("active")}><span>{T("المشاريع النشطة", "Active projects")}</span><b>{num(k.active)}</b><small>{T("من", "of")} {num(k.total)} {T("مشروعاً", "projects")}</small></button>
+            <button className="card c-teal" onClick={() => go("on_track")}><span>{T("تحقق مستهدفاتها", "Meeting their targets")}</span><b>{pct(k.on_target_pct)}</b><small>{T("من المشاريع النشطة", "of active projects")}</small></button>
+            <button className="card c-orange" onClick={() => go("delayed")}><span>{T("المشاريع المتأخرة", "Delayed projects")}</span><b>{num(k.delayed)}</b><small>{T("أنشطة فائتة أو SPI دون 0.9", "Late activities or SPI below 0.9")}</small></button>
+            <button className="card c-red" onClick={() => go("high_risk")}><span>{T("عالية المخاطر", "High-risk projects")}</span><b>{num(k.high_risk)}</b><small>{num(k.needs_intervention)} {T("تتطلب تدخلاً إدارياً", "need management action")}</small></button>
+          </div>
+
+          <div className="grid g4w">
+            <section className="panel"><header><h2>{T("نسبة الإنجاز الكلية", "Overall progress")}</h2></header><div className="body"><Gauge value={k.progress} fmt={v => num(v)} color="var(--c-actual)" sub={T("مرجحة بالميزانية، %", "Weighted by budget, %")} /></div></section>
+            <section className="panel"><header><h2>{T("الميزانية المصروفة", "Budget used")}</h2></header><div className="body"><Gauge value={k.actual} max={k.budget || 1} ends fmt={v => money(v).replace(/ [^ ]+$/, "")} color="var(--c-lime)" marker={k.actual + k.committed} sub={T(`المصروف من ${money(k.budget)}؛ الخط = مع الالتزامات`, `Spent of ${money(k.budget)}; line = with commitments`)} /></div></section>
+            <section className="panel"><header><h2>{T("الالتزام بالجدول", "Schedule adherence")}</h2></header><div className="body"><Gauge value={k.schedule_adherence} color="var(--c1)" sub={T("مشاريع نشطة بـ SPI ≥ 0.9، %", "Active projects with SPI ≥ 0.9, %")} /></div></section>
+            <section className="panel"><header><h2>{T("أداء المحفظة", "Portfolio score")}</h2></header><div className="body"><Gauge value={k.portfolio_score} color="var(--c-violet)" sub={T("40% مستهدفات، 30% جدول، 30% تكلفة", "40% targets, 30% schedule, 30% cost")} /></div></section>
+          </div>
+
+          <div className="grid g2">
+            <section className="panel"><header><h2>{T("حالة المشاريع", "Project status")}</h2></header><div className="body rings">
+              {([["on_track", "على المسار", "On track", "var(--c-actual)", (p: any) => p.status === "active" && p.health === "green"], ["all", "تحتاج متابعة", "At risk", "var(--c4)", (p: any) => p.status === "active" && p.health === "amber"],
+                ["delayed", "متعثرة", "Behind", "var(--s-critical)", (p: any) => p.status !== "completed" && p.health === "red"], ["completed", "مكتملة", "Complete", "var(--c1)", (p: any) => p.status === "completed"],
+                ["planned", "مخطط لها", "Planned", "var(--ink-3)", (p: any) => p.status === "planned"]] as any[]).map(([f, a, e, c, fn]) => { const n = P.filter(fn).length;
+                return <Ring key={e} label={T(a, e)} color={c} count={n} pct={P.length ? Math.round((n / P.length) * 100) : 0} onPick={() => go(f)} />; })}</div></section>
+            <section className="panel"><header><h2>{T("الميزانية مقابل الفعلي حسب المحفظة", "Budget against actual by portfolio")}</h2></header><div className="body">
+              <VBars names={[T("الميزانية", "Budget"), T("الفعلي", "Actual")]} fmt={v => money(v).replace(/ [^ ]+$/, "")} rows={d.by_portfolio.map((g: any) => ({ label: N(g), a: g.budget, b: g.actual }))} /></div></section>
+          </div>
+
           <div className="kpis">
             {tile(T("إجمالي المشاريع", "Total projects"), num(k.total), "all")}
-            {tile(T("النشطة", "Active"), num(k.active), "active")}
             {tile(T("المخطط لها", "Planned"), num(k.planned), "planned")}
             {tile(T("المكتملة", "Completed"), num(k.completed), "completed")}
-            {tile(T("المتأخرة", "Delayed"), num(k.delayed), "delayed", T("أنشطة فائتة أو SPI دون 0.9", "Late activities or SPI below 0.9"), k.delayed ? "critical" : "")}
             {tile(T("المتوقفة", "On hold"), num(k.on_hold), "on_hold", undefined, k.on_hold ? "warning" : "")}
-            {tile(T("عالية المخاطر", "High risk"), num(k.high_risk), "high_risk", T("لديها خطر حرج مفتوح", "Have an open critical risk"), k.high_risk ? "critical" : "")}
-            {tile(T("تتطلب تدخلاً إدارياً", "Need management action"), num(k.needs_intervention), "intervention", undefined, k.needs_intervention ? "critical" : "")}
             {tile(T("الميزانية المعتمدة", "Approved budget"), money(k.budget), "all")}
             {tile(T("المصروفات الفعلية", "Actual spend"), money(k.actual), "all", `${pct(k.budget ? (k.actual / k.budget) * 100 : 0)} ${T("من الميزانية", "of budget")}`)}
             {tile(T("الالتزامات المالية", "Commitments"), money(k.committed), "all")}
-            {tile(T("نسبة الإنجاز الكلية", "Overall progress"), pct(k.progress, 1), "all", T("مرجحة بالميزانية", "Weighted by budget"))}
-            {tile(T("تحقق مستهدفاتها", "Meeting their targets"), pct(k.on_target_pct), "on_track", T("من المشاريع النشطة", "Of active projects"))}
-            {tile(T("الالتزام بالجدول", "Schedule adherence"), pct(k.schedule_adherence), "delayed", T("مشاريع نشطة بـ SPI ≥ 0.9", "Active projects with SPI ≥ 0.9"))}
             {tile(T("الالتزام بالميزانية", "Budget adherence"), pct(k.budget_adherence), "over_budget", T("مشاريع نشطة بـ CPI ≥ 0.9", "Active projects with CPI ≥ 0.9"))}
-            {tile(T("أداء المحفظة", "Portfolio score"), `${num(k.portfolio_score)} / 100`, "all", T("40% مستهدفات، 30% جدول، 30% تكلفة", "40% targets, 30% schedule, 30% cost"))}
           </div>
 
           <section className="panel"><header><div><h2>{T("خريطة الأداء المؤسسي", "Performance heatmap")}</h2><p>{T("كل مشروع جارٍ في أربعة أبعاد. اضغط الصف لفتح مركز قيادة المشروع.", "Each running project on four dimensions. Select a row to open its command centre.")}</p></div></header>
@@ -78,8 +94,8 @@ export default function Dashboard() {
             <section className="panel"><header><div><h2>{T("المخاطر المفتوحة حسب المستوى", "Open risks by level")}</h2></div><Link className="btn sm" to="/risks">{T("افتح سجل المخاطر", "Open risk register")}</Link></header><div className="body"><Segments parts={LV.map(([key, a, e, c]) => ({ label: T(a, e), value: d.by_risk[key], color: c }))} /></div></section>
             <section className="panel"><header><div><h2>{T("الأداء الزمني", "Schedule performance")}</h2><p>{T("الإنجاز الفعلي مقابل المخطط لكل مشروع جارٍ", "Actual against planned progress for each running project")}</p></div></header>
               <div className="body"><PairBars names={[T("الفعلي %", "Actual %")!, T("المخطط %", "Planned %")!]} fmt={v => pct(v)} onPick={r => nav(`/projects/${r.key}/gantt`)} rows={live.map((p: any) => ({ key: p.id, label: N(p), a: p.progress, b: p.planned_progress }))} /></div></section>
-            <section className="panel"><header><div><h2>{T("الأداء المالي", "Financial performance")}</h2><p>{T("المصروف الفعلي مقابل الميزانية المعتمدة", "Actual spend against approved budget")}</p></div></header>
-              <div className="body"><PairBars names={[T("المصروف", "Actual"), T("الميزانية", "Budget")]} fmt={money} onPick={r => nav(`/projects/${r.key}/finance`)} rows={P.filter((p: any) => p.actual > 0).map((p: any) => ({ key: p.id, label: N(p), a: p.actual, b: p.budget }))} /></div></section>
+            <section className="panel"><header><h2>{T("الميزانية مقابل الفعلي حسب الإدارة", "Budget against actual by department")}</h2></header>
+              <div className="body"><VBars names={[T("الميزانية", "Budget"), T("الفعلي", "Actual")]} fmt={v => money(v).replace(/ [^ ]+$/, "")} rows={d.by_department.map((g: any) => ({ label: N(g), a: g.budget, b: g.actual }))} /></div></section>
             <section className="panel"><header><h2>{T("الإنجاز حسب البرنامج", "Progress by programme")}</h2></header><div className="body"><PairBars names={[T("الفعلي %", "Actual %"), T("المخطط %", "Planned %")]} fmt={v => pct(v, 1)} rows={d.by_program.map((g: any) => ({ label: N(g), a: g.progress, b: g.planned }))} /></div></section>
             <section className="panel"><header><h2>{T("الإنجاز حسب المحفظة", "Progress by portfolio")}</h2></header><div className="body"><PairBars names={[T("الفعلي %", "Actual %"), T("المخطط %", "Planned %")]} fmt={v => pct(v, 1)} rows={d.by_portfolio.map((g: any) => ({ label: N(g), a: g.progress, b: g.planned }))} /></div></section>
             <section className="panel"><header><div><h2>{T("اتجاه المخاطر عبر الزمن", "Risk trend")}</h2><p>{T("عدد المخاطر المفتوحة الحرجة والعالية أسبوعياً", "Open critical and high risks, week by week")}</p></div></header>

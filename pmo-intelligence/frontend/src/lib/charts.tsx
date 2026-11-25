@@ -117,3 +117,53 @@ export function RiskMatrix({ grid, onPick }: { grid: any[][]; onPick?: (cell: an
     <div className="row small muted" style={{ justifyContent: "space-between" }}><span>{T("↑ الاحتمالية · الأثر ←", "↑ Probability · Impact →")}</span>
       <div className="legend">{Object.entries(lv).map(([k, l]) => <span key={k}><i className={`lv-${k}`} />{T(...l)}</span>)}</div></div>{tip.node}</div>;
 }
+
+/** Half-circle gauge: one value against a maximum, with scale labels around the arc. */
+export function Gauge({ value, max = 100, color = "var(--c1)", fmt, sub, marker, ends }: { value: number | null | undefined; max?: number; color?: string; fmt?: (v: number) => string; sub?: string; marker?: number; ends?: boolean }) {
+  const { num } = useApp();
+  const tip = useTip();
+  const f = fmt || ((v: number) => num(v));
+  const v = Math.max(0, Math.min(max, value ?? 0)), R = 78, W = 30, cx = 130, cy = 118;
+  const pt = (frac: number, r: number) => [cx - r * Math.cos(Math.PI * frac), cy - r * Math.sin(Math.PI * frac)];
+  const arc = (to: number) => { const [x0, y0] = pt(0, R), [x1, y1] = pt(to, R); return `M${x0.toFixed(1)},${y0.toFixed(1)} A${R},${R} 0 0 1 ${x1.toFixed(1)},${y1.toFixed(1)}`; };
+  const frac = max ? v / max : 0;
+  return <div className="chart gauge" onMouseMove={e => tip.show(e, <><b>{value == null ? "—" : f(value)}</b> / {f(max)}{sub ? <><br />{sub}</> : null}</>)} onMouseLeave={tip.hide}>
+    <svg viewBox="0 0 260 142" role="img" aria-label={`${value == null ? "—" : f(value)} / ${f(max)}`}>
+      <path d={arc(1)} fill="none" stroke="var(--gauge-track)" strokeWidth={W} />
+      {frac > 0.004 ? <path className="gauge-val" d={arc(frac)} fill="none" stroke={color} strokeWidth={W} pathLength={100} strokeDasharray="100" /> : null}
+      {(ends ? [0, 1] : [0, .25, .5, .75, 1]).map(t => { const [x, y] = pt(t, R + W / 2 + (ends ? 4 : 12)); if (ends) return <text key={t} x={x} y={cy + 16} textAnchor="middle">{f(max * t)}</text>; return <text key={t} x={x} y={y + 4} textAnchor="middle">{f(max * t)}</text>; })}
+      {marker != null ? (() => { const [x0, y0] = pt(marker / max, R - W / 2 - 3), [x1, y1] = pt(marker / max, R + W / 2 + 3); return <line x1={x0} y1={y0} x2={x1} y2={y1} stroke="var(--ink)" strokeWidth={2} />; })() : null}
+      <text x={cx} y={cy - 6} textAnchor="middle" className="gauge-num">{value == null ? "—" : f(value)}</text>
+    </svg>{sub ? <div className="gauge-sub">{sub}</div> : null}{tip.node}</div>;
+}
+
+/** Share ring: one percentage with its label underneath. */
+export function Ring({ pct, label, color, count, onPick }: { pct: number; label: string; color: string; count?: number; onPick?: () => void }) {
+  const { num } = useApp();
+  const C = 2 * Math.PI * 30;
+  return <button className="ring" onClick={onPick} disabled={!onPick} aria-label={`${label}: ${num(pct)}%`}>
+    <svg viewBox="0 0 80 80" width="84" height="84"><circle cx="40" cy="40" r="30" fill="none" stroke="var(--gauge-track)" strokeWidth="9" />
+      {pct > 0 ? <circle className="ring-val" cx="40" cy="40" r="30" fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" strokeDasharray={`${(C * pct) / 100} ${C}`} transform="rotate(-90 40 40)" /> : null}
+      <text x="40" y="45" textAnchor="middle">{num(pct)}%</text></svg>
+    <b>{label}</b>{count != null ? <small>{num(count)}</small> : null}</button>;
+}
+
+/** Vertical grouped bars on one shared axis (budget against actual per category). */
+export function VBars({ rows, names, fmt, height = 240 }: { rows: { label: string; a: number; b: number }[]; names: [string, string]; fmt?: (v: number) => string; height?: number }) {
+  const { num } = useApp();
+  const tip = useTip();
+  const f = fmt || ((v: number) => num(v));
+  const W = 560, H = height, pl = 64, pr = 10, pt = 10, pb = 34;
+  const top = Math.max(1, ...rows.flatMap(r => [r.a, r.b])) * 1.1, n = Math.max(1, rows.length), slot = (W - pl - pr) / n, bw = Math.min(34, slot / 3.2);
+  const y = (v: number) => pt + (1 - v / top) * (H - pt - pb);
+  return <div className="chart stack tight"><Legend items={[[names[0], "var(--c-budget)"], [names[1], "var(--c-actual)"]]} />
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" style={{ direction: "ltr" }}>
+      {[0, .25, .5, .75, 1].map(t => <g key={t}><line className="grid-l" x1={pl} x2={W - pr} y1={y(top * t)} y2={y(top * t)} /><text x={pl - 6} y={y(top * t) + 4} textAnchor="end">{f(top * t)}</text></g>)}
+      {rows.map((r, i) => { const x0 = pl + slot * i + slot / 2;
+        return <g key={i} onMouseMove={e => tip.show(e, <><b>{r.label}</b><br />{names[0]}: {f(r.a)}<br />{names[1]}: {f(r.b)}</>)} onMouseLeave={tip.hide}>
+          <rect x={x0 - slot / 2} y={pt} width={slot} height={H - pt - pb} fill="transparent" />
+          <rect className="vbar" x={x0 - bw - 1} y={y(r.a)} width={bw} height={Math.max(0, H - pb - y(r.a))} rx={2} fill="var(--c-budget)" />
+          <rect className="vbar" x={x0 + 1} y={y(r.b)} width={bw} height={Math.max(0, H - pb - y(r.b))} rx={2} fill="var(--c-actual)" />
+          <text x={x0} y={H - 14} textAnchor="middle">{r.label.length > 16 ? r.label.slice(0, 15) + "…" : r.label}</text></g>; })}
+    </svg>{tip.node}</div>;
+}
