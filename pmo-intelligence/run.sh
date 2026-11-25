@@ -5,8 +5,8 @@ cd "$(dirname "$0")/backend"
 PY=python3; command -v python3 >/dev/null || PY=python
 [ -d .venv ] || $PY -m venv .venv
 . .venv/bin/activate
-pip install -q --upgrade pip
-pip install -q -r requirements.txt
+echo 'Installing packages (first run downloads about 60 MB)...'
+pip install --disable-pip-version-check -r requirements-local.txt
 echo
 echo "PMO INTELLIGENCE:  http://localhost:8000"
 echo "Sign in:  director@pmo.local  /  Pmo@2026!     (Ctrl+C to stop)"
