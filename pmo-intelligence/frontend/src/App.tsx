@@ -111,7 +111,7 @@ export default function App() {
   const { T, N, user, setUser, lang, setLang, theme, setTheme, can } = useApp();
   const [boot, setBoot] = useState(hasToken());
   const [open, setOpen] = useState(false);
-  const [pinned, setPinned] = useState(() => store.get("pmo_menu") === "pinned");
+  const [pinned, setPinned] = useState(() => store.get("pmo_menu") !== "folded");
   const go = useNavigate();
   const loc = useLocation();
   useEffect(() => { if (hasToken()) api.get("/auth/me").then(setUser).catch(() => {}).finally(() => setBoot(false)); const out = () => setUser(null); window.addEventListener("pmo-logout", out); return () => window.removeEventListener("pmo-logout", out); }, []);  // eslint-disable-line
@@ -135,7 +135,7 @@ export default function App() {
     </nav>
     <div className="main">
       <header className="top no-print"><a href="#content" className="btn ghost sm" style={{ position: "absolute", insetInlineStart: -9999 }} onFocus={e => (e.currentTarget.style.insetInlineStart = "8px")} onBlur={e => (e.currentTarget.style.insetInlineStart = "-9999px")}>{T("انتقل إلى المحتوى", "Skip to content")}</a>
-        <button className="btn ghost icon" onClick={() => { if (window.matchMedia("(max-width: 960px)").matches) setOpen(true); else { store.set("pmo_menu", pinned ? null : "pinned"); setPinned(!pinned); } }}
+        <button className="btn ghost icon" onClick={() => { if (window.matchMedia("(max-width: 960px)").matches) setOpen(true); else { store.set("pmo_menu", pinned ? "folded" : null); setPinned(!pinned); } }}
           aria-label={T("القائمة", "Menu")} aria-pressed={pinned} title={pinned ? T("اطوِ القائمة", "Collapse menu") : T("ثبّت القائمة مفتوحة", "Keep menu open")}><Menu /></button>
         <GlobalSearch />
         {can("initiation.use") || can("project.write") ? <button className="btn create" onClick={() => go(can("initiation.use") ? "/initiation" : "/projects")}><Plus />{T("إنشاء", "Create")}</button> : null}

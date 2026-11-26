@@ -1,4 +1,4 @@
-import { ReactNode, useRef, useState } from "react";
+import { ReactNode, useId, useRef, useState } from "react";
 import { useApp } from "./core";
 
 /* One tooltip for every chart: follows the pointer, text in the UI ink (never the series colour). */
@@ -71,6 +71,7 @@ export function Lines({ x, series, fmt, height = 220, marker }: { x: string[]; s
   const tip = useTip();
   const ref = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const gid = useId().replace(/:/g, "");
   const f = fmt || ((v: number) => num(v));
   const W = 640, H = height, pl = 56, pr = 16, pt = 12, pb = 26;
   const rtl = lang === "ar";
@@ -95,6 +96,9 @@ export function Lines({ x, series, fmt, height = 220, marker }: { x: string[]; s
         <text x={rtl ? W - pl + 6 : pl - 6} y={py(t) + 4} textAnchor={rtl ? "start" : "end"}>{f(t)}</text></g>)}
       {[0, Math.floor((n - 1) / 2), n - 1].filter((v, i, a) => a.indexOf(v) === i && x[v]).map(i => <text key={i} x={px(i)} y={H - 6} textAnchor="middle">{date(x[i])}</text>)}
       {marker != null && marker >= 0 && <line x1={px(marker)} x2={px(marker)} y1={pt} y2={H - pb} stroke="var(--ink-3)" strokeDasharray="3 3" />}
+      <defs>{series.map((s, i) => <linearGradient key={i} id={`${gid}-${i}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={s.color} stopOpacity=".28" /><stop offset="1" stopColor={s.color} stopOpacity="0" /></linearGradient>)}</defs>
+      {series.map((s, i) => { const pts = s.values.map((v, j) => (v == null ? null : [px(j), py(v)] as [number, number])).filter(Boolean) as [number, number][];
+        return pts.length > 1 && !s.dash ? <path key={`a${i}`} className="area" d={`M${pts[0][0]},${H - pb} ${pts.map(q => `L${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(" ")} L${pts[pts.length - 1][0]},${H - pb} Z`} fill={`url(#${gid}-${i})`} /> : null; })}
       {series.map(s => <path key={s.name} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={2} strokeDasharray={s.dash ? "5 4" : undefined} strokeLinejoin="round" strokeLinecap="round" />)}
       {hover != null && <><line x1={px(hover)} x2={px(hover)} y1={pt} y2={H - pb} className="axis" />
         {series.map(s => s.values[hover] != null && <circle key={s.name} cx={px(hover)} cy={py(s.values[hover] as number)} r={4.5} fill={s.color} stroke="var(--surface)" strokeWidth={2} />)}</>}
